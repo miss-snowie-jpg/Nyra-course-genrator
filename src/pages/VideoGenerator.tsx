@@ -7,10 +7,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Sparkles, ArrowLeft, Video, Download, Play, User, Volume2, Monitor, Clock, Loader2 } from "lucide-react";
+import { Sparkles, ArrowLeft, Video, Download, Play, User, Volume2, Monitor, Clock, Loader2, History, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+interface SavedVideo {
+  id: string;
+  title: string;
+  prompt: string;
+  video_url: string;
+  avatar_id: string | null;
+  voice_id: string | null;
+  aspect_ratio: string | null;
+  duration: number | null;
+  created_at: string;
+}
 
 const AVATARS = [
   { id: "josh_lite3_20230714", name: "Josh", preview: "Professional Male" },
@@ -41,6 +54,8 @@ const VideoGenerator = () => {
   const [loading, setLoading] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [savedVideos, setSavedVideos] = useState<SavedVideo[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [formData, setFormData] = useState({
     prompt: "",
     avatar: "josh_lite3_20230714",
@@ -53,9 +68,78 @@ const VideoGenerator = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         navigate('/auth');
+      } else {
+        fetchVideoHistory();
       }
     });
   }, [navigate]);
+
+  const fetchVideoHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('videos')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSavedVideos(data || []);
+    } catch (error) {
+      console.error('Error fetching video history:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const saveVideoToHistory = async (videoUrl: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const title = formData.prompt.slice(0, 50) + (formData.prompt.length > 50 ? '...' : '');
+      
+      const { error } = await supabase
+        .from('videos')
+        .insert({
+          user_id: session.user.id,
+          title,
+          prompt: formData.prompt,
+          video_url: videoUrl,
+          avatar_id: formData.avatar,
+          voice_id: formData.voice,
+          aspect_ratio: formData.aspectRatio,
+          duration: formData.duration,
+        });
+
+      if (error) throw error;
+      fetchVideoHistory();
+    } catch (error) {
+      console.error('Error saving video:', error);
+    }
+  };
+
+  const deleteVideo = async (videoId: string) => {
+    try {
+      const { error } = await supabase
+        .from('videos')
+        .delete()
+        .eq('id', videoId);
+
+      if (error) throw error;
+      toast.success("Video deleted");
+      fetchVideoHistory();
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      toast.error("Failed to delete video");
+    }
+  };
+
+  const playFromHistory = (video: SavedVideo) => {
+    setVideoUrl(video.video_url);
+    if (video.aspect_ratio) {
+      setFormData(prev => ({ ...prev, aspectRatio: video.aspect_ratio! }));
+    }
+    toast.success("Playing video from history");
+  };
 
   const handleGenerate = async () => {
     if (!formData.prompt.trim()) {
@@ -102,11 +186,12 @@ const VideoGenerator = () => {
         setProgress(estimatedProgress);
 
         if (statusData.status === 'completed') {
-          const videoUrl = statusData.video_url;
-          if (videoUrl) {
-            setVideoUrl(videoUrl);
+          const generatedVideoUrl = statusData.video_url;
+          if (generatedVideoUrl) {
+            setVideoUrl(generatedVideoUrl);
             setProgress(100);
             toast.success("Video generated successfully!");
+            await saveVideoToHistory(generatedVideoUrl);
             setLoading(false);
           } else {
             throw new Error("No video URL in response");
@@ -445,6 +530,94 @@ const VideoGenerator = () => {
             </Card>
           </div>
         </div>
+
+        {/* Video History Section */}
+        <Card className="mt-8 border-border/50 bg-card/80 p-6 backdrop-blur-sm">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <History className="h-5 w-5 text-primary" />
+              Video History
+              <span className="text-sm font-normal text-muted-foreground">
+                ({savedVideos.length} video{savedVideos.length !== 1 ? 's' : ''})
+              </span>
+            </h3>
+
+            {loadingHistory ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : savedVideos.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <Video className="h-12 w-12 mb-3 opacity-50" />
+                <p className="font-medium">No videos yet</p>
+                <p className="text-sm">Your generated videos will appear here</p>
+              </div>
+            ) : (
+              <ScrollArea className="h-[300px]">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pr-4">
+                  {savedVideos.map((video) => {
+                    const avatarInfo = AVATARS.find(a => a.id === video.avatar_id);
+                    const voiceInfo = VOICES.find(v => v.id === video.voice_id);
+                    
+                    return (
+                      <div 
+                        key={video.id}
+                        className="group relative rounded-xl border border-border/50 bg-card/50 overflow-hidden hover:border-primary/50 transition-all"
+                      >
+                        {/* Video Thumbnail */}
+                        <div className="aspect-video bg-gradient-to-br from-muted/50 to-muted flex items-center justify-center">
+                          <video 
+                            src={video.video_url} 
+                            className="w-full h-full object-cover"
+                            preload="metadata"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="gap-2"
+                              onClick={() => playFromHistory(video)}
+                            >
+                              <Play className="h-4 w-4" />
+                              Play
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {/* Video Info */}
+                        <div className="p-3 space-y-2">
+                          <p className="font-medium text-sm line-clamp-2" title={video.prompt}>
+                            {video.title}
+                          </p>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              <span>{avatarInfo?.name || 'Unknown'}</span>
+                            </div>
+                            <span>{video.aspect_ratio || '16:9'}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(video.created_at).toLocaleDateString()}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                              onClick={() => deleteVideo(video.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+        </Card>
       </main>
     </div>
   );
