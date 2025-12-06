@@ -65,6 +65,48 @@ export type Database = {
         }
         Relationships: []
       }
+      videos: {
+        Row: {
+          aspect_ratio: string | null
+          avatar_id: string | null
+          created_at: string
+          duration: number | null
+          id: string
+          prompt: string
+          status: string | null
+          title: string
+          user_id: string
+          video_url: string
+          voice_id: string | null
+        }
+        Insert: {
+          aspect_ratio?: string | null
+          avatar_id?: string | null
+          created_at?: string
+          duration?: number | null
+          id?: string
+          prompt: string
+          status?: string | null
+          title: string
+          user_id: string
+          video_url: string
+          voice_id?: string | null
+        }
+        Update: {
+          aspect_ratio?: string | null
+          avatar_id?: string | null
+          created_at?: string
+          duration?: number | null
+          id?: string
+          prompt?: string
+          status?: string | null
+          title?: string
+          user_id?: string
+          video_url?: string
+          voice_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
