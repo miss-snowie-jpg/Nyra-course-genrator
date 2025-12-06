@@ -7,9 +7,27 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, ArrowLeft, ArrowRight } from "lucide-react";
+import { Sparkles, ArrowLeft, ArrowRight, Palette, Type } from "lucide-react";
 import { toast } from "sonner";
 import { PaymentMethodDialog } from "@/components/PaymentMethodDialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
+const COLOR_THEMES = [
+  { id: "blue", name: "Ocean Blue", primary: "#3B82F6", secondary: "#1E40AF", accent: "#60A5FA" },
+  { id: "purple", name: "Royal Purple", primary: "#8B5CF6", secondary: "#6D28D9", accent: "#A78BFA" },
+  { id: "green", name: "Forest Green", primary: "#10B981", secondary: "#047857", accent: "#34D399" },
+  { id: "orange", name: "Sunset Orange", primary: "#F97316", secondary: "#C2410C", accent: "#FB923C" },
+  { id: "pink", name: "Rose Pink", primary: "#EC4899", secondary: "#BE185D", accent: "#F472B6" },
+  { id: "teal", name: "Modern Teal", primary: "#14B8A6", secondary: "#0D9488", accent: "#2DD4BF" },
+];
+
+const FONT_STYLES = [
+  { id: "modern", name: "Modern Sans", heading: "Inter", body: "Inter", preview: "Clean and professional" },
+  { id: "elegant", name: "Elegant Serif", heading: "Playfair Display", body: "Lora", preview: "Classic and refined" },
+  { id: "playful", name: "Playful", heading: "Poppins", body: "Nunito", preview: "Fun and friendly" },
+  { id: "minimal", name: "Minimal", heading: "DM Sans", body: "DM Sans", preview: "Simple and sleek" },
+  { id: "bold", name: "Bold Impact", heading: "Montserrat", body: "Open Sans", preview: "Strong and impactful" },
+];
 
 interface CourseModule {
   title: string;
@@ -35,6 +53,8 @@ const Wizard = () => {
     style: "",
     level: "",
     monetization: "",
+    colorTheme: "blue",
+    fontStyle: "modern",
   });
 
   useEffect(() => {
@@ -47,7 +67,7 @@ const Wizard = () => {
   }, [navigate]);
 
   const handleNext = () => {
-    if (step < 5) {
+    if (step < 6) {
       setStep(step + 1);
     } else {
       handleSubmit();
@@ -106,7 +126,7 @@ const Wizard = () => {
 
       // Set generated course to display
       setGeneratedCourse(courseData.course);
-      setStep(6); // Move to course preview step
+      setStep(7); // Move to course preview step
       toast.success("Course generated successfully!");
 
       // Generate course website in background
@@ -140,9 +160,13 @@ const Wizard = () => {
       case 3: return formData.style.length > 0;
       case 4: return formData.level.length > 0;
       case 5: return formData.monetization.length > 0;
+      case 6: return formData.colorTheme.length > 0 && formData.fontStyle.length > 0;
       default: return false;
     }
   };
+
+  const selectedColorTheme = COLOR_THEMES.find(t => t.id === formData.colorTheme);
+  const selectedFontStyle = FONT_STYLES.find(f => f.id === formData.fontStyle);
 
   const handlePaymentSelection = async (method: "paypal" | "telebirr") => {
     setPaymentLoading(true);
@@ -201,18 +225,18 @@ const Wizard = () => {
       </header>
 
       {/* Progress Bar */}
-      {step <= 5 && (
+      {step <= 6 && (
         <div className="border-b border-border/50 bg-card/30">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between text-sm">
-              {[1, 2, 3, 4, 5].map((i) => (
+              {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="flex items-center">
                   <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
                     i <= step ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
                   }`}>
                     {i}
                   </div>
-                  {i < 5 && <div className={`h-1 w-12 md:w-24 ${i < step ? 'bg-primary' : 'bg-muted'}`} />}
+                  {i < 6 && <div className={`h-1 w-8 md:w-16 ${i < step ? 'bg-primary' : 'bg-muted'}`} />}
                 </div>
               ))}
             </div>
@@ -223,7 +247,7 @@ const Wizard = () => {
       {/* Main Content */}
       <main className="container mx-auto max-w-4xl px-4 py-12">
         <Card className="border-border/50 bg-card/80 p-8 backdrop-blur-sm">
-          {step === 6 && generatedCourse ? (
+          {step === 7 && generatedCourse ? (
             <div className="space-y-6">
               <div className="text-center">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4">
@@ -373,8 +397,124 @@ const Wizard = () => {
             </div>
           )}
 
+          {step === 6 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-3xl font-bold flex items-center gap-2">
+                  <Palette className="h-8 w-8 text-primary" />
+                  Design Your Course
+                </h2>
+                <p className="text-muted-foreground mt-2">Choose colors and typography for your course website</p>
+              </div>
+
+              {/* Color Theme Selection */}
+              <div className="space-y-4">
+                <Label className="text-lg font-semibold flex items-center gap-2">
+                  <Palette className="h-5 w-5" />
+                  Color Theme
+                </Label>
+                <RadioGroup
+                  value={formData.colorTheme}
+                  onValueChange={(value) => updateField('colorTheme', value)}
+                  className="grid grid-cols-2 md:grid-cols-3 gap-4"
+                >
+                  {COLOR_THEMES.map((theme) => (
+                    <Label
+                      key={theme.id}
+                      htmlFor={theme.id}
+                      className={`flex flex-col items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all hover:scale-105 ${
+                        formData.colorTheme === theme.id 
+                          ? 'border-primary bg-primary/10 shadow-lg' 
+                          : 'border-border/50 bg-card/50 hover:border-primary/50'
+                      }`}
+                    >
+                      <RadioGroupItem value={theme.id} id={theme.id} className="sr-only" />
+                      <div className="flex gap-1">
+                        <div 
+                          className="w-8 h-8 rounded-full shadow-md" 
+                          style={{ backgroundColor: theme.primary }}
+                        />
+                        <div 
+                          className="w-8 h-8 rounded-full shadow-md" 
+                          style={{ backgroundColor: theme.secondary }}
+                        />
+                        <div 
+                          className="w-8 h-8 rounded-full shadow-md" 
+                          style={{ backgroundColor: theme.accent }}
+                        />
+                      </div>
+                      <span className="font-medium text-sm">{theme.name}</span>
+                    </Label>
+                  ))}
+                </RadioGroup>
+              </div>
+
+              {/* Font Style Selection */}
+              <div className="space-y-4">
+                <Label className="text-lg font-semibold flex items-center gap-2">
+                  <Type className="h-5 w-5" />
+                  Typography Style
+                </Label>
+                <RadioGroup
+                  value={formData.fontStyle}
+                  onValueChange={(value) => updateField('fontStyle', value)}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                >
+                  {FONT_STYLES.map((font) => (
+                    <Label
+                      key={font.id}
+                      htmlFor={`font-${font.id}`}
+                      className={`flex flex-col gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all hover:scale-[1.02] ${
+                        formData.fontStyle === font.id 
+                          ? 'border-primary bg-primary/10 shadow-lg' 
+                          : 'border-border/50 bg-card/50 hover:border-primary/50'
+                      }`}
+                    >
+                      <RadioGroupItem value={font.id} id={`font-${font.id}`} className="sr-only" />
+                      <span className="font-bold text-lg">{font.name}</span>
+                      <span className="text-sm text-muted-foreground">{font.preview}</span>
+                      <div className="text-xs text-muted-foreground/70">
+                        Headings: {font.heading} • Body: {font.body}
+                      </div>
+                    </Label>
+                  ))}
+                </RadioGroup>
+              </div>
+
+              {/* Preview Card */}
+              {selectedColorTheme && selectedFontStyle && (
+                <div className="mt-6 p-6 rounded-xl border border-border/50 bg-gradient-to-br from-card/80 to-background/80">
+                  <h4 className="font-semibold mb-3 text-muted-foreground text-sm uppercase tracking-wide">Preview</h4>
+                  <div 
+                    className="p-6 rounded-lg"
+                    style={{ 
+                      background: `linear-gradient(135deg, ${selectedColorTheme.primary}15, ${selectedColorTheme.accent}15)`,
+                      borderLeft: `4px solid ${selectedColorTheme.primary}`
+                    }}
+                  >
+                    <h3 
+                      className="text-2xl font-bold mb-2"
+                      style={{ color: selectedColorTheme.primary }}
+                    >
+                      Your Course Title
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      This is how your course content will look with the {selectedFontStyle.name} typography and {selectedColorTheme.name} color scheme.
+                    </p>
+                    <div 
+                      className="inline-block px-4 py-2 rounded-lg text-white font-medium"
+                      style={{ backgroundColor: selectedColorTheme.primary }}
+                    >
+                      Get Started
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Navigation Buttons */}
-          {step <= 5 && (
+          {step <= 6 && (
             <div className="mt-8 flex justify-between">
               <Button variant="outline" onClick={handleBack}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -385,8 +525,8 @@ const Wizard = () => {
                 disabled={!isStepValid() || loading}
                 className="bg-gradient-to-r from-primary to-accent"
               >
-                {loading ? 'Generating...' : step === 5 ? 'Generate Course' : 'Next'}
-                {step < 5 && <ArrowRight className="ml-2 h-4 w-4" />}
+                {loading ? 'Generating...' : step === 6 ? 'Generate Course' : 'Next'}
+                {step < 6 && <ArrowRight className="ml-2 h-4 w-4" />}
               </Button>
             </div>
           )}
