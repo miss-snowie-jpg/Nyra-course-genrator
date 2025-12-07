@@ -58,7 +58,23 @@ serve(async (req) => {
       )
     }
 
-    console.log("Generating video with prompt:", body.prompt)
+    // Extract parameters from request body with defaults
+    const avatarId = body.avatarId || "Angela-inblackskirt-20220820"
+    const voiceId = body.voiceId || "1bd001e7e50f421d891986aad5158bc8"
+    const aspectRatio = body.aspectRatio || "16:9"
+    
+    // Calculate dimensions based on aspect ratio
+    let width = 1280
+    let height = 720
+    if (aspectRatio === "9:16") {
+      width = 720
+      height = 1280
+    } else if (aspectRatio === "1:1") {
+      width = 720
+      height = 720
+    }
+
+    console.log("Generating video with:", { prompt: body.prompt, avatarId, voiceId, aspectRatio, width, height })
     
     // Generate video using HeyGen API
     const videoData = {
@@ -66,22 +82,22 @@ serve(async (req) => {
         {
           character: {
             type: "avatar",
-            avatar_id: "default",
+            avatar_id: avatarId,
             avatar_style: "normal",
           },
           voice: {
             type: "text",
             input_text: body.prompt,
-            voice_id: "default",
+            voice_id: voiceId,
           },
         },
       ],
-      title: "Generated Video",
+      title: body.title || "Generated Video",
       test: true,
       caption: false,
       dimension: {
-        width: 1280,
-        height: 720,
+        width,
+        height,
       },
     }
 
