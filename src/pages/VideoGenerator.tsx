@@ -168,11 +168,17 @@ const VideoGenerator = () => {
       if (!startData?.videoId) throw new Error("Failed to start video generation");
 
       const videoId = startData.videoId;
+      setProgress(10); // Initial progress after generation started
       
       let attempts = 0;
       const maxAttempts = 60;
       
       const checkStatus = async (): Promise<void> => {
+        attempts++;
+        // Update progress: start at 10%, go up to 95%
+        const estimatedProgress = Math.min(10 + (attempts / maxAttempts) * 85, 95);
+        setProgress(estimatedProgress);
+        
         const { data: statusData, error: statusError } = await supabase.functions.invoke('generate-video', {
           body: { videoId }
         });
@@ -180,10 +186,6 @@ const VideoGenerator = () => {
         if (statusError) throw statusError;
 
         console.log('Video status:', statusData);
-        
-        // Update progress estimation
-        const estimatedProgress = Math.min((attempts / maxAttempts) * 100, 95);
-        setProgress(estimatedProgress);
 
         if (statusData.status === 'completed') {
           const generatedVideoUrl = statusData.video_url;
@@ -199,8 +201,8 @@ const VideoGenerator = () => {
         } else if (statusData.status === 'failed' || statusData.error) {
           throw new Error(statusData.error || "Video generation failed");
         } else if (attempts < maxAttempts) {
-          attempts++;
-          setTimeout(checkStatus, 5000);
+          // Poll every 3 seconds for faster feedback
+          setTimeout(checkStatus, 3000);
         } else {
           throw new Error("Video generation timed out");
         }
