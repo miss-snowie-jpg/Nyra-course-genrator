@@ -40,92 +40,63 @@ serve(async (req) => {
       .update({ website_status: 'generating' })
       .eq('id', courseId);
 
-    // Use Lovable AI to generate the course website components
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
-    
-    const prompt = `Generate a complete course website interface with the following structure:
-
-Course Title: ${course.title}
-Description: ${course.description}
-Target Audience: ${course.audience}
-Level: ${course.level}
-Style: ${course.style}
-
-Modules and Lessons:
-${JSON.stringify(course.modules, null, 2)}
-
-Create the following React components in a JSON structure:
-1. CourseHomePage - Landing page with course overview and modules list
-2. ModulePage - Individual module page with lessons
-3. LessonPage - Individual lesson content page
-4. ProgressTracker - Component to track student progress
-5. CourseNavigation - Navigation between modules and lessons
-
-Return ONLY valid JSON with this structure:
-{
-  "components": {
-    "CourseHomePage": "component code here",
-    "ModulePage": "component code here",
-    "LessonPage": "component code here",
-    "ProgressTracker": "component code here",
-    "CourseNavigation": "component code here"
-  },
-  "styles": "tailwind classes and custom styles",
-  "routes": [array of route definitions]
-}`;
-
-    const aiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': supabaseUrl,
-        'X-Title': 'Nyra Course Generator'
+    // Generate website structure based on course data
+    const websiteCode = {
+      components: {
+        CourseHomePage: `
+          <div class="course-home">
+            <header class="hero-section">
+              <h1>${course.title}</h1>
+              <p>${course.description}</p>
+              <div class="meta">
+                <span>Level: ${course.level}</span>
+                <span>Style: ${course.style}</span>
+                <span>For: ${course.audience}</span>
+              </div>
+            </header>
+            <section class="modules-grid">
+              ${(course.modules as any[]).map((m: any, i: number) => `
+                <div class="module-card">
+                  <h3>Module ${i + 1}: ${m.title}</h3>
+                  <ul>${m.lessons.map((l: string) => `<li>${l}</li>`).join('')}</ul>
+                </div>
+              `).join('')}
+            </section>
+          </div>
+        `,
+        ProgressTracker: `
+          <div class="progress-tracker">
+            <div class="progress-bar" style="width: 0%"></div>
+            <span>0% Complete</span>
+          </div>
+        `,
+        CourseNavigation: `
+          <nav class="course-nav">
+            ${(course.modules as any[]).map((m: any, i: number) => `
+              <a href="#module-${i + 1}">${m.title}</a>
+            `).join('')}
+          </nav>
+        `
       },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
-      })
-    });
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', errorText);
-      throw new Error('Failed to generate course website');
-    }
-
-    const aiData = await aiResponse.json();
-    const generatedContent = aiData.choices[0].message.content;
-    
-    console.log('AI response received, parsing...');
-
-    // Parse the generated content
-    let websiteCode;
-    try {
-      // Try to extract JSON from markdown code blocks if present
-      const jsonMatch = generatedContent.match(/```json\n([\s\S]*?)\n```/) || 
-                       generatedContent.match(/```\n([\s\S]*?)\n```/);
-      
-      if (jsonMatch) {
-        websiteCode = JSON.parse(jsonMatch[1]);
-      } else {
-        websiteCode = JSON.parse(generatedContent);
+      styles: {
+        primaryColor: '#3B82F6',
+        secondaryColor: '#1E40AF',
+        fontFamily: 'Inter, sans-serif'
+      },
+      routes: [
+        { path: '/', component: 'CourseHomePage' },
+        { path: '/module/:id', component: 'ModulePage' },
+        { path: '/lesson/:moduleId/:lessonId', component: 'LessonPage' }
+      ],
+      metadata: {
+        title: course.title,
+        description: course.description,
+        audience: course.audience,
+        level: course.level,
+        modulesCount: (course.modules as any[]).length,
+        lessonsCount: (course.modules as any[]).reduce((acc: number, m: any) => acc + m.lessons.length, 0)
       }
-    } catch (parseError) {
-      console.error('Error parsing AI response:', parseError);
-      // Fallback structure
-      websiteCode = {
-        components: {
-          CourseHomePage: generatedContent,
-          error: 'Failed to parse AI response into structured format'
-        }
-      };
-    }
+    };
 
     // Store the generated website code
     const { error: updateError } = await supabase
