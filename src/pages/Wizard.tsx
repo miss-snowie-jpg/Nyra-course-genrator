@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sparkles, ArrowLeft, ArrowRight, Palette, Type } from "lucide-react";
 import { toast } from "sonner";
-import { PaymentMethodDialog } from "@/components/PaymentMethodDialog";
+
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const COLOR_THEMES = [
@@ -45,7 +45,7 @@ const Wizard = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [generatedCourse, setGeneratedCourse] = useState<GeneratedCourse | null>(null);
-  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [formData, setFormData] = useState({
     topic: "",
@@ -168,42 +168,26 @@ const Wizard = () => {
   const selectedColorTheme = COLOR_THEMES.find(t => t.id === formData.colorTheme);
   const selectedFontStyle = FONT_STYLES.find(f => f.id === formData.fontStyle);
 
-  const handlePaymentSelection = async (method: "paypal" | "telebirr") => {
+  const handlePublishCourse = async () => {
     setPaymentLoading(true);
     try {
-      if (method === "paypal") {
-        const { data, error } = await supabase.functions.invoke('paypal-payment', {
-          body: { 
-            amount: 40, 
-            currency: "USD",
-            courseId: generatedCourse?.title 
-          }
-        });
-        
-        if (error) throw error;
-        
-        if (data.approvalUrl) {
-          window.open(data.approvalUrl, '_blank');
-          toast.success("Redirecting to PayPal...");
+      const { data, error } = await supabase.functions.invoke('dodo-checkout', {
+        body: { 
+          amount: 40, 
+          currency: "USD",
+          courseId: generatedCourse?.title,
+          successUrl: `${window.location.origin}/dashboard?payment=success`,
+          cancelUrl: `${window.location.origin}/wizard`
         }
-      } else {
-        const { data, error } = await supabase.functions.invoke('telebirr-payment', {
-          body: { 
-            amount: 1600,
-            phoneNumber: "+251911234567", // In production, collect from user
-            courseId: generatedCourse?.title 
-          }
-        });
-        
-        if (error) throw error;
-        
-        if (data.paymentUrl) {
-          window.open(data.paymentUrl, '_blank');
-          toast.success("Redirecting to Telebirr...");
-        }
-      }
+      });
       
-      setShowPaymentDialog(false);
+      if (error) throw error;
+      
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else {
+        toast.error("Failed to get checkout URL");
+      }
     } catch (error: any) {
       console.error('Payment error:', error);
       toast.error(error.message || "Payment failed");
@@ -287,7 +271,7 @@ const Wizard = () => {
                 <Button
                   size="lg"
                   className="w-full bg-gradient-to-r from-accent to-primary hover:opacity-90 transition-opacity text-lg"
-                  onClick={() => setShowPaymentDialog(true)}
+                  onClick={handlePublishCourse}
                   disabled={paymentLoading}
                 >
                   <Sparkles className="mr-2 h-5 w-5" />
@@ -533,12 +517,6 @@ const Wizard = () => {
         </Card>
       </main>
 
-      {/* Payment Method Selection */}
-      <PaymentMethodDialog
-        open={showPaymentDialog}
-        onOpenChange={setShowPaymentDialog}
-        onSelectPayment={handlePaymentSelection}
-      />
     </div>
   );
 };
