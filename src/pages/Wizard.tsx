@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,9 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, ArrowLeft, ArrowRight, Palette, Type } from "lucide-react";
+import { Sparkles, ArrowLeft, ArrowRight, Palette, Type, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
-
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const COLOR_THEMES = [
@@ -42,11 +41,12 @@ interface GeneratedCourse {
 
 const Wizard = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [generatedCourse, setGeneratedCourse] = useState<GeneratedCourse | null>(null);
-  
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [formData, setFormData] = useState({
     topic: "",
     audience: "",
@@ -64,7 +64,13 @@ const Wizard = () => {
         navigate('/auth');
       }
     });
-  }, [navigate]);
+
+    // Check for payment success from URL
+    if (searchParams.get('payment') === 'success') {
+      setPaymentSuccess(true);
+      toast.success("Payment successful! Your course is now published.");
+    }
+  }, [navigate, searchParams]);
 
   const handleNext = () => {
     if (step < 6) {
@@ -196,6 +202,47 @@ const Wizard = () => {
     }
   };
 
+  // Payment Success View
+  if (paymentSuccess) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="max-w-lg mx-auto p-8 text-center space-y-6">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-green-600 mb-4">
+            <CheckCircle className="w-10 h-10 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold">Payment Successful!</h1>
+          <p className="text-muted-foreground text-lg">
+            Your course has been published successfully. Students can now access your course.
+          </p>
+          <div className="bg-gradient-to-br from-primary/10 to-accent/10 rounded-lg p-6 space-y-3">
+            <h3 className="font-semibold text-lg">What happens next?</h3>
+            <ul className="text-left space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5" />
+                <span>Your course website is now live</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5" />
+                <span>Students can enroll and start learning</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5" />
+                <span>You'll receive notifications for new enrollments</span>
+              </li>
+            </ul>
+          </div>
+          <Button
+            size="lg"
+            className="w-full bg-gradient-to-r from-primary to-accent"
+            onClick={() => navigate('/dashboard')}
+          >
+            Go to Dashboard
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -275,7 +322,7 @@ const Wizard = () => {
                   disabled={paymentLoading}
                 >
                   <Sparkles className="mr-2 h-5 w-5" />
-                  {paymentLoading ? "Processing..." : "Publish Course"}
+                  {paymentLoading ? "Processing..." : "Publish Course - $40"}
                 </Button>
                 <Button
                   variant="outline"
@@ -448,49 +495,47 @@ const Wizard = () => {
                     <Label
                       key={font.id}
                       htmlFor={`font-${font.id}`}
-                      className={`flex flex-col gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all hover:scale-[1.02] ${
+                      className={`flex flex-col gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all hover:scale-105 ${
                         formData.fontStyle === font.id 
                           ? 'border-primary bg-primary/10 shadow-lg' 
                           : 'border-border/50 bg-card/50 hover:border-primary/50'
                       }`}
                     >
                       <RadioGroupItem value={font.id} id={`font-${font.id}`} className="sr-only" />
-                      <span className="font-bold text-lg">{font.name}</span>
-                      <span className="text-sm text-muted-foreground">{font.preview}</span>
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-lg">{font.name}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{font.preview}</p>
                       <div className="text-xs text-muted-foreground/70">
-                        Headings: {font.heading} • Body: {font.body}
+                        Headings: {font.heading} | Body: {font.body}
                       </div>
                     </Label>
                   ))}
                 </RadioGroup>
               </div>
 
-              {/* Preview Card */}
+              {/* Preview */}
               {selectedColorTheme && selectedFontStyle && (
-                <div className="mt-6 p-6 rounded-xl border border-border/50 bg-gradient-to-br from-card/80 to-background/80">
-                  <h4 className="font-semibold mb-3 text-muted-foreground text-sm uppercase tracking-wide">Preview</h4>
-                  <div 
-                    className="p-6 rounded-lg"
-                    style={{ 
-                      background: `linear-gradient(135deg, ${selectedColorTheme.primary}15, ${selectedColorTheme.accent}15)`,
-                      borderLeft: `4px solid ${selectedColorTheme.primary}`
-                    }}
-                  >
-                    <h3 
-                      className="text-2xl font-bold mb-2"
+                <div className="mt-6 p-6 rounded-xl border border-border/50" style={{ 
+                  background: `linear-gradient(135deg, ${selectedColorTheme.primary}10, ${selectedColorTheme.accent}10)` 
+                }}>
+                  <h3 className="text-lg font-semibold mb-2">Preview</h3>
+                  <div className="space-y-2">
+                    <h4 
+                      className="text-2xl font-bold" 
                       style={{ color: selectedColorTheme.primary }}
                     >
                       Your Course Title
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      This is how your course content will look with the {selectedFontStyle.name} typography and {selectedColorTheme.name} color scheme.
+                    </h4>
+                    <p className="text-muted-foreground">
+                      This is how your course content will look with {selectedColorTheme.name} colors and {selectedFontStyle.name} typography.
                     </p>
-                    <div 
-                      className="inline-block px-4 py-2 rounded-lg text-white font-medium"
+                    <button 
+                      className="px-4 py-2 rounded-lg text-white font-medium"
                       style={{ backgroundColor: selectedColorTheme.primary }}
                     >
-                      Get Started
-                    </div>
+                      Enroll Now
+                    </button>
                   </div>
                 </div>
               )}
@@ -502,7 +547,7 @@ const Wizard = () => {
             <div className="mt-8 flex justify-between">
               <Button variant="outline" onClick={handleBack}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                {step === 1 ? 'Cancel' : 'Back'}
+                {step === 1 ? 'Dashboard' : 'Back'}
               </Button>
               <Button 
                 onClick={handleNext} 
@@ -510,13 +555,12 @@ const Wizard = () => {
                 className="bg-gradient-to-r from-primary to-accent"
               >
                 {loading ? 'Generating...' : step === 6 ? 'Generate Course' : 'Next'}
-                {step < 6 && <ArrowRight className="ml-2 h-4 w-4" />}
+                {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
               </Button>
             </div>
           )}
         </Card>
       </main>
-
     </div>
   );
 };

@@ -21,34 +21,24 @@ serve(async (req) => {
       throw new Error('DODO_API_KEY not configured');
     }
 
-    // Create checkout session with Dodo Payments
-    const response = await fetch('https://api.dodopayments.com/payments', {
+    // Use Dodo Payments checkout sessions API
+    // For test mode use: https://test.dodopayments.com/checkouts
+    // For live mode use: https://live.dodopayments.com/checkouts
+    const response = await fetch('https://test.dodopayments.com/checkouts', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        billing: {
-          city: "string",
-          country: "AC",
-          state: "string",
-          street: "string",
-          zipcode: "string"
-        },
-        customer: {
-          customer_id: courseId,
-          email: "customer@example.com",
-          name: "Customer"
-        },
-        payment_link: true,
         product_cart: [
           {
-            product_id: courseId,
+            product_id: courseId || 'course_product',
             quantity: 1
           }
         ],
-        return_url: successUrl || `${req.headers.get('origin')}/dashboard?payment=success`,
+        success_url: successUrl || `${req.headers.get('origin')}/dashboard?payment=success`,
+        cancel_url: cancelUrl,
         metadata: {
           course_id: courseId,
         },
@@ -58,7 +48,7 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Dodo API error:", errorText);
-      throw new Error(`Dodo API error: ${response.status}`);
+      throw new Error(`Dodo API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
@@ -66,8 +56,8 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        checkout_url: data.payment_link,
-        payment_id: data.payment_id,
+        checkout_url: data.checkout_url,
+        session_id: data.session_id,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
