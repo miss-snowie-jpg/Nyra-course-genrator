@@ -45,8 +45,10 @@ const Wizard = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [generatedCourse, setGeneratedCourse] = useState<GeneratedCourse | null>(null);
+  const [courseRecordId, setCourseRecordId] = useState<string | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [dodoProductId, setDodoProductId] = useState("");
   const [formData, setFormData] = useState({
     topic: "",
     audience: "",
@@ -58,18 +60,19 @@ const Wizard = () => {
   });
 
   useEffect(() => {
-    // Check authentication
+    // If user is coming back from payment, show success even if their session expired.
+    if (searchParams.get('payment') === 'success') {
+      setPaymentSuccess(true);
+      toast.success("Payment successful! Your course is now published.");
+      return;
+    }
+
+    // Otherwise, enforce auth for the wizard.
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         navigate('/auth');
       }
     });
-
-    // Check for payment success from URL
-    if (searchParams.get('payment') === 'success') {
-      setPaymentSuccess(true);
-      toast.success("Payment successful! Your course is now published.");
-    }
   }, [navigate, searchParams]);
 
   const handleNext = () => {
@@ -130,6 +133,8 @@ const Wizard = () => {
 
       if (insertError) throw insertError;
 
+      setCourseRecordId(insertedCourse.id);
+
       // Set generated course to display
       setGeneratedCourse(courseData.course);
       setStep(7); // Move to course preview step
@@ -177,25 +182,41 @@ const Wizard = () => {
   const handlePublishCourse = async () => {
     setPaymentLoading(true);
     try {
+      if (!courseRecordId) {
+        toast.error("Missing course id. Please generate the course again.");
+        return;
+      }
+
+      const productId = dodoProductId.trim();
+      if (!productId) {
+        toast.error("Please enter your Dodo product ID before paying.");
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const customerEmail = session?.user?.email;
+
       const { data, error } = await supabase.functions.invoke('dodo-checkout', {
-        body: { 
-          amount: 40, 
+        body: {
+          amount: 40,
           currency: "USD",
-          courseId: generatedCourse?.title?.replace(/\s+/g, '_').toLowerCase() || 'course',
+          productId,
+          courseId: courseRecordId,
           courseName: generatedCourse?.title || 'Course Purchase',
+          customerEmail,
           successUrl: `${window.location.origin}/wizard?payment=success`,
-          cancelUrl: `${window.location.origin}/wizard`
+          cancelUrl: `${window.location.origin}/wizard`,
         }
       });
-      
+
       if (error) throw error;
-      
-      const checkoutUrl = data.checkout_url || data.payment_link;
+
+      const checkoutUrl = data?.checkout_url;
       if (checkoutUrl) {
         window.location.href = checkoutUrl;
       } else {
         console.error('No checkout URL in response:', data);
-        toast.error("Failed to get checkout URL. Please check your Dodo product configuration.");
+        toast.error("Failed to get checkout URL.");
       }
     } catch (error: any) {
       console.error('Payment error:', error);
@@ -318,6 +339,20 @@ const Wizard = () => {
               </div>
 
               <div className="flex flex-col gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="dodoProductId">Dodo Product ID</Label>
+                  <Input
+                    id="dodoProductId"
+                    placeholder="e.g., prod_123"
+                    value={dodoProductId}
+                    onChange={(e) => setDodoProductId(e.target.value)}
+                    className="border-border/50 bg-background/50"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This must match a one-time payment product you created in Dodo.
+                  </p>
+                </div>
+
                 <Button
                   size="lg"
                   className="w-full bg-gradient-to-r from-accent to-primary hover:opacity-90 transition-opacity text-lg"
