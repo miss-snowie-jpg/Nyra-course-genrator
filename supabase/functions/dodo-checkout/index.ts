@@ -12,52 +12,66 @@ serve(async (req) => {
   }
 
   try {
-    const { amount, currency, courseId, successUrl, cancelUrl } = await req.json();
+    const { amount, currency, courseId, courseName, successUrl, cancelUrl } = await req.json();
     
-    console.log("Creating Dodo checkout session:", { amount, currency, courseId });
+    console.log("Creating Dodo checkout session:", { amount, currency, courseId, courseName });
 
     const apiKey = Deno.env.get('DODO_API_KEY');
     if (!apiKey) {
       throw new Error('DODO_API_KEY not configured');
     }
 
-    // Use Dodo Payments checkout sessions API
-    // For test mode use: https://test.dodopayments.com/checkouts
-    // For live mode use: https://live.dodopayments.com/checkouts
-    const response = await fetch('https://test.dodopayments.com/checkouts', {
+    // Dodo Payments API - create a one-time payment checkout
+    // For test mode use: https://test.dodopayments.com/v1/payments
+    // For live mode use: https://api.dodopayments.com/v1/payments
+    const response = await fetch('https://test.dodopayments.com/v1/payments', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        billing: {
+          city: "Addis Ababa",
+          country: "ET",
+          state: "AA",
+          street: "Default",
+          zipcode: "1000"
+        },
+        customer: {
+          email: "customer@example.com",
+          name: courseName || "Course Purchase"
+        },
+        payment_link: true,
         product_cart: [
           {
             product_id: courseId || 'course_product',
             quantity: 1
           }
         ],
-        success_url: successUrl || `${req.headers.get('origin')}/dashboard?payment=success`,
-        cancel_url: cancelUrl,
+        return_url: successUrl || `${req.headers.get('origin')}/dashboard?payment=success`,
         metadata: {
           course_id: courseId,
+          course_name: courseName
         },
       }),
     });
 
+    const responseText = await response.text();
+    console.log("Dodo API response status:", response.status);
+    console.log("Dodo API response:", responseText);
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Dodo API error:", errorText);
-      throw new Error(`Dodo API error: ${response.status} - ${errorText}`);
+      throw new Error(`Dodo API error: ${response.status} - ${responseText}`);
     }
 
-    const data = await response.json();
-    console.log("Dodo checkout session created:", data);
+    const data = JSON.parse(responseText);
+    console.log("Dodo payment created:", data);
 
     return new Response(
       JSON.stringify({
-        checkout_url: data.checkout_url,
-        session_id: data.session_id,
+        checkout_url: data.payment_link || data.payment_url || data.url,
+        payment_id: data.payment_id,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

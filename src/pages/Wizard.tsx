@@ -181,18 +181,21 @@ const Wizard = () => {
         body: { 
           amount: 40, 
           currency: "USD",
-          courseId: generatedCourse?.title,
-          successUrl: `${window.location.origin}/dashboard?payment=success`,
+          courseId: generatedCourse?.title?.replace(/\s+/g, '_').toLowerCase() || 'course',
+          courseName: generatedCourse?.title || 'Course Purchase',
+          successUrl: `${window.location.origin}/wizard?payment=success`,
           cancelUrl: `${window.location.origin}/wizard`
         }
       });
       
       if (error) throw error;
       
-      if (data.checkout_url) {
-        window.location.href = data.checkout_url;
+      const checkoutUrl = data.checkout_url || data.payment_link;
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
       } else {
-        toast.error("Failed to get checkout URL");
+        console.error('No checkout URL in response:', data);
+        toast.error("Failed to get checkout URL. Please check your Dodo product configuration.");
       }
     } catch (error: any) {
       console.error('Payment error:', error);
