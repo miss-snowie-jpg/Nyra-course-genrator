@@ -48,7 +48,8 @@ const Wizard = () => {
   const [courseRecordId, setCourseRecordId] = useState<string | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const DODO_PRODUCT_ID = "pdt_uysfRw7MOTEsSU5SaePxz";
+  const DODO_PRODUCT_ID_MONTHLY = "pdt_uysfRw7MOTEsSU5SaePxz";
+  const DODO_PRODUCT_ID_ANNUAL = "pdt_0NUDIGAMwMUEKsgsqEcK9";
   const [formData, setFormData] = useState({
     topic: "",
     audience: "",
@@ -187,7 +188,7 @@ const Wizard = () => {
         return;
       }
 
-      const productId = DODO_PRODUCT_ID;
+      const productId = formData.monetization === 'annual' ? DODO_PRODUCT_ID_ANNUAL : DODO_PRODUCT_ID_MONTHLY;
 
       const { data: { session } } = await supabase.auth.getSession();
       const customerEmail = session?.user?.email;
@@ -442,6 +443,7 @@ const Wizard = () => {
                     <SelectItem value="free">Free - Build audience first</SelectItem>
                     <SelectItem value="one-time">One-time Payment</SelectItem>
                     <SelectItem value="subscription">Monthly Subscription</SelectItem>
+                    <SelectItem value="annual">Annual Subscription</SelectItem>
                     <SelectItem value="tiered">Tiered Pricing (Basic/Pro/Premium)</SelectItem>
                   </SelectContent>
                 </Select>
