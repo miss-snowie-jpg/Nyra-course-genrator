@@ -48,7 +48,7 @@ const Wizard = () => {
   const [courseRecordId, setCourseRecordId] = useState<string | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [dodoProductId, setDodoProductId] = useState("");
+  const DODO_PRODUCT_ID = "pdt_opSYvZuV8aSRkjMjqiHdN";
   const [formData, setFormData] = useState({
     topic: "",
     audience: "",
@@ -187,11 +187,7 @@ const Wizard = () => {
         return;
       }
 
-      const productId = dodoProductId.trim();
-      if (!productId) {
-        toast.error("Please enter your Dodo product ID before paying.");
-        return;
-      }
+      const productId = DODO_PRODUCT_ID;
 
       const { data: { session } } = await supabase.auth.getSession();
       const customerEmail = session?.user?.email;
@@ -339,19 +335,6 @@ const Wizard = () => {
               </div>
 
               <div className="flex flex-col gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="dodoProductId">Dodo Product ID</Label>
-                  <Input
-                    id="dodoProductId"
-                    placeholder="e.g., prod_123"
-                    value={dodoProductId}
-                    onChange={(e) => setDodoProductId(e.target.value)}
-                    className="border-border/50 bg-background/50"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    This must match a one-time payment product you created in Dodo.
-                  </p>
-                </div>
 
                 <Button
                   size="lg"
