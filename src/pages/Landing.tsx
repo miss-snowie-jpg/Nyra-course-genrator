@@ -281,7 +281,10 @@ const Landing = () => {
                     ? 'bg-gradient-to-r from-primary to-accent' 
                     : 'bg-secondary'
                 }`}
-                onClick={() => navigate('/auth')}
+                onClick={() => {
+                  const planType = plan.name === 'Annual' ? 'annual' : plan.name === 'Monthly' ? 'subscription' : 'free';
+                  navigate(`/auth?plan=${planType}`);
+                }}
               >
                 {plan.cta}
               </Button>
