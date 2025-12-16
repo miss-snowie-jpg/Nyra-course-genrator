@@ -60,7 +60,7 @@ serve(async (req) => {
 
     // Extract parameters from request body with defaults (handle both camelCase and snake_case)
     const avatarId = body.avatar_id || body.avatarId || "Kristin_public_2_20240108"
-    const voiceId = body.voice_id || body.voiceId || "en-US-JennyNeural"
+    const voiceId = body.voice_id || body.voiceId || "1bd001e7e50f421d891986aad5c35bc9"
     const aspectRatio = body.aspect_ratio || body.aspectRatio || "16:9"
     
     // Calculate dimensions based on aspect ratio

@@ -35,12 +35,12 @@ const AVATARS = [
 ];
 
 const VOICES = [
-  { id: "en-US-AriaNeural", name: "Aria", language: "English (US)", gender: "Female" },
-  { id: "en-US-GuyNeural", name: "Guy", language: "English (US)", gender: "Male" },
-  { id: "en-GB-SoniaNeural", name: "Sonia", language: "English (UK)", gender: "Female" },
-  { id: "en-GB-RyanNeural", name: "Ryan", language: "English (UK)", gender: "Male" },
-  { id: "es-ES-ElviraNeural", name: "Elvira", language: "Spanish", gender: "Female" },
-  { id: "fr-FR-DeniseNeural", name: "Denise", language: "French", gender: "Female" },
+  { id: "1bd001e7e50f421d891986aad5c35bc9", name: "Sara", language: "English (US)", gender: "Female" },
+  { id: "131a436c47064f708210df6628ef8f32", name: "Jack", language: "English (US)", gender: "Male" },
+  { id: "2d5b0e6cf36f460aa7fc47e3eee4ba54", name: "Emily", language: "English (US)", gender: "Female" },
+  { id: "001cc6d54eae4ca2b5fb16ca8e8eb9bb", name: "Michael", language: "English (US)", gender: "Male" },
+  { id: "e5e2d01ff91e4f8b89a21a0f2d2e5e22", name: "Sophie", language: "English (UK)", gender: "Female" },
+  { id: "a0e99841e8bf4f1dbe1ed6f16c1d0e9c", name: "David", language: "English (UK)", gender: "Male" },
 ];
 
 const ASPECT_RATIOS = [
@@ -59,7 +59,7 @@ const VideoGenerator = () => {
   const [formData, setFormData] = useState({
     prompt: "",
     avatar: "Kristin_public_2_20240108",
-    voice: "en-US-AriaNeural",
+    voice: "1bd001e7e50f421d891986aad5c35bc9",
     aspectRatio: "16:9",
     duration: 30,
   });
