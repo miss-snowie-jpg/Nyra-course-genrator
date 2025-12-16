@@ -198,7 +198,7 @@ const Wizard = () => {
 
       const { data, error } = await supabase.functions.invoke('dodo-checkout', {
         body: {
-          amount: 40,
+          amount: 40.99,
           currency: "USD",
           productId,
           courseId: courseRecordId,
