@@ -43,11 +43,15 @@ serve(async (req) => {
       });
     }
 
+    // Convert amount to cents for Dodo API (e.g., 40.99 -> 4099)
+    const amountInCents = Math.round((amount || 40.99) * 100);
+
     const requestBody = {
       product_cart: [
         {
           product_id: resolvedProductId,
           quantity: 1,
+          amount: amountInCents,
         },
       ],
       customer: {
