@@ -34,14 +34,12 @@ const AVATARS = [
   { id: "Eric_public_pro2_20230608", name: "Eric", preview: "Young Male" },
 ];
 
-const VOICES = [
-  { id: "1bd001e7e50f421d891986aad5c35bc9", name: "Sara", language: "English (US)", gender: "Female" },
-  { id: "131a436c47064f708210df6628ef8f32", name: "Jack", language: "English (US)", gender: "Male" },
-  { id: "2d5b0e6cf36f460aa7fc47e3eee4ba54", name: "Emily", language: "English (US)", gender: "Female" },
-  { id: "001cc6d54eae4ca2b5fb16ca8e8eb9bb", name: "Michael", language: "English (US)", gender: "Male" },
-  { id: "e5e2d01ff91e4f8b89a21a0f2d2e5e22", name: "Sophie", language: "English (UK)", gender: "Female" },
-  { id: "a0e99841e8bf4f1dbe1ed6f16c1d0e9c", name: "David", language: "English (UK)", gender: "Male" },
-];
+interface Voice {
+  id: string;
+  name: string;
+  language: string;
+  gender: string;
+}
 
 const ASPECT_RATIOS = [
   { id: "16:9", name: "Landscape (16:9)", icon: "🖥️", description: "Best for YouTube, presentations" },
@@ -56,10 +54,12 @@ const VideoGenerator = () => {
   const [progress, setProgress] = useState(0);
   const [savedVideos, setSavedVideos] = useState<SavedVideo[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [voices, setVoices] = useState<Voice[]>([]);
+  const [loadingVoices, setLoadingVoices] = useState(true);
   const [formData, setFormData] = useState({
     prompt: "",
     avatar: "Kristin_public_2_20240108",
-    voice: "1bd001e7e50f421d891986aad5c35bc9",
+    voice: "",
     aspectRatio: "16:9",
     duration: 30,
   });
@@ -70,9 +70,26 @@ const VideoGenerator = () => {
         navigate('/auth');
       } else {
         fetchVideoHistory();
+        fetchVoices();
       }
     });
   }, [navigate]);
+
+  const fetchVoices = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('list-heygen-voices');
+      if (error) throw error;
+      if (data?.voices && data.voices.length > 0) {
+        setVoices(data.voices);
+        setFormData(prev => ({ ...prev, voice: data.voices[0].id }));
+      }
+    } catch (error) {
+      console.error('Error fetching voices:', error);
+      toast.error("Failed to load voices");
+    } finally {
+      setLoadingVoices(false);
+    }
+  };
 
   const fetchVideoHistory = async () => {
     try {
@@ -241,7 +258,7 @@ const VideoGenerator = () => {
   };
 
   const selectedAvatar = AVATARS.find(a => a.id === formData.avatar);
-  const selectedVoice = VOICES.find(v => v.id === formData.voice);
+  const selectedVoice = voices.find(v => v.id === formData.voice);
 
   return (
     <div className="min-h-screen bg-background">
@@ -338,7 +355,9 @@ const VideoGenerator = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {VOICES.map((voice) => (
+                      {loadingVoices ? (
+                        <SelectItem value="loading" disabled>Loading voices...</SelectItem>
+                      ) : voices.map((voice) => (
                         <SelectItem key={voice.id} value={voice.id}>
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{voice.name}</span>
@@ -559,7 +578,7 @@ const VideoGenerator = () => {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pr-4">
                   {savedVideos.map((video) => {
                     const avatarInfo = AVATARS.find(a => a.id === video.avatar_id);
-                    const voiceInfo = VOICES.find(v => v.id === video.voice_id);
+                    const voiceInfo = voices.find(v => v.id === video.voice_id);
                     
                     return (
                       <div 

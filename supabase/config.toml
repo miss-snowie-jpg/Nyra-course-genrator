@@ -9,6 +9,9 @@ verify_jwt = true
 [functions.generate-video]
 verify_jwt = true
 
+[functions.list-heygen-voices]
+verify_jwt = false
+
 [functions.paypal-payment]
 verify_jwt = false
 
