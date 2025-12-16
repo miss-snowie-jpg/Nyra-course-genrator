@@ -48,7 +48,7 @@ const Wizard = () => {
   const [courseRecordId, setCourseRecordId] = useState<string | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const DODO_PRODUCT_ID = "pdt_opSYvZuV8aSRkjMjqiHdN";
+  const DODO_PRODUCT_ID = "pdt_uysfRw7MOTEsSU5SaePxz";
   const [formData, setFormData] = useState({
     topic: "",
     audience: "",
