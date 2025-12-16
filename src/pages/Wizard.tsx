@@ -68,10 +68,17 @@ const Wizard = () => {
       return;
     }
 
+    // Pre-select monetization plan from URL if provided
+    const planFromUrl = searchParams.get('plan');
+    if (planFromUrl && !formData.monetization) {
+      setFormData(prev => ({ ...prev, monetization: planFromUrl }));
+    }
+
     // Otherwise, enforce auth for the wizard.
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
-        navigate('/auth');
+        const plan = searchParams.get('plan');
+        navigate(plan ? `/auth?plan=${plan}` : '/auth');
       }
     });
   }, [navigate, searchParams]);
