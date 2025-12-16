@@ -26,12 +26,12 @@ interface SavedVideo {
 }
 
 const AVATARS = [
-  { id: "josh_lite3_20230714", name: "Josh", preview: "Professional Male" },
-  { id: "anna_lite3_20230714", name: "Anna", preview: "Professional Female" },
-  { id: "angela_lite3_20230714", name: "Angela", preview: "Friendly Female" },
-  { id: "wayne_lite3_20230714", name: "Wayne", preview: "Casual Male" },
-  { id: "monica_lite3_20230714", name: "Monica", preview: "Elegant Female" },
-  { id: "tyler_lite3_20230714", name: "Tyler", preview: "Young Male" },
+  { id: "Kristin_public_2_20240108", name: "Kristin", preview: "Professional Female" },
+  { id: "josh_lite3_20240621", name: "Josh", preview: "Professional Male" },
+  { id: "Angela-inblackskirt-20220820", name: "Angela", preview: "Friendly Female" },
+  { id: "Tyler-incasualsuit-20220721", name: "Tyler", preview: "Casual Male" },
+  { id: "Kayla-incasualsuit-20220818", name: "Kayla", preview: "Elegant Female" },
+  { id: "Eric_public_pro2_20230608", name: "Eric", preview: "Young Male" },
 ];
 
 const VOICES = [
@@ -58,7 +58,7 @@ const VideoGenerator = () => {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [formData, setFormData] = useState({
     prompt: "",
-    avatar: "josh_lite3_20230714",
+    avatar: "Kristin_public_2_20240108",
     voice: "en-US-AriaNeural",
     aspectRatio: "16:9",
     duration: 30,
