@@ -18,7 +18,10 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
 
   const getRedirectUrl = () => {
-    if (plan) {
+    if (plan && plan !== 'free') {
+      return `/checkout?plan=${plan}`;
+    }
+    if (plan === 'free') {
       return `/wizard?plan=${plan}`;
     }
     return '/dashboard';
