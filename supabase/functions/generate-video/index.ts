@@ -11,22 +11,21 @@ serve(async (req) => {
   }
 
   try {
-    const HEYGEN_API_KEY = Deno.env.get('HEYGEN_API_KEY')
-    if (!HEYGEN_API_KEY) {
-      throw new Error('HEYGEN_API_KEY is not set')
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY is not set')
     }
 
     const body = await req.json()
 
     // If it's a status check request
-    if (body.videoId) {
-      console.log("Checking status for video:", body.videoId)
-      const statusResponse = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${body.videoId}`, {
-        method: 'GET',
-        headers: {
-          'X-Api-Key': HEYGEN_API_KEY,
-        },
-      })
+    if (body.operationName) {
+      console.log("Checking status for operation:", body.operationName)
+      
+      const statusResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/${body.operationName}?key=${GEMINI_API_KEY}`,
+        { method: 'GET' }
+      )
 
       if (!statusResponse.ok) {
         const errorText = await statusResponse.text()
@@ -35,15 +34,29 @@ serve(async (req) => {
       }
 
       const statusData = await statusResponse.json()
-      console.log("Status check response:", statusData)
+      console.log("Status check response:", JSON.stringify(statusData))
       
-      return new Response(JSON.stringify({
-        status: statusData.data?.status || 'unknown',
-        video_url: statusData.data?.video_url,
-        error: statusData.data?.error
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      if (statusData.done) {
+        // Extract video URL from response
+        const generatedVideos = statusData.response?.generateVideoResponse?.generatedSamples
+        const videoUri = generatedVideos?.[0]?.video?.uri
+        
+        return new Response(JSON.stringify({
+          status: 'completed',
+          video_url: videoUri ? `${videoUri}&key=${GEMINI_API_KEY}` : null,
+          error: statusData.error?.message
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      } else {
+        return new Response(JSON.stringify({
+          status: 'processing',
+          video_url: null,
+          metadata: statusData.metadata
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
     }
 
     // If it's a generation request
@@ -58,57 +71,39 @@ serve(async (req) => {
       )
     }
 
-    // Extract parameters from request body with defaults (handle both camelCase and snake_case)
-    const avatarId = body.avatar_id || body.avatarId || "Kristin_public_2_20240108"
-    const voiceId = body.voice_id || body.voiceId || "1bd001e7e50f421d891986aad5c35bc9"
+    // Extract parameters from request body
     const aspectRatio = body.aspect_ratio || body.aspectRatio || "16:9"
-    
-    // Calculate dimensions based on aspect ratio
-    let width = 1280
-    let height = 720
-    if (aspectRatio === "9:16") {
-      width = 720
-      height = 1280
-    } else if (aspectRatio === "1:1") {
-      width = 720
-      height = 720
-    }
+    const duration = body.duration || 8 // Veo 3 supports 5-8 seconds
 
-    console.log("Generating video with:", { prompt: body.prompt, avatarId, voiceId, aspectRatio, width, height })
+    console.log("Generating video with Veo 3:", { prompt: body.prompt, aspectRatio, duration })
     
-    // Generate video using HeyGen API
-    const videoData = {
-      video_inputs: [
+    // Generate video using Veo 3 API
+    const requestBody = {
+      instances: [
         {
-          character: {
-            type: "avatar",
-            avatar_id: avatarId,
-            avatar_style: "normal",
-          },
-          voice: {
-            type: "text",
-            input_text: body.prompt,
-            voice_id: voiceId,
-          },
-        },
+          prompt: body.prompt
+        }
       ],
-      title: body.title || "Generated Video",
-      test: true,
-      caption: false,
-      dimension: {
-        width,
-        height,
-      },
+      parameters: {
+        aspectRatio: aspectRatio,
+        sampleCount: 1,
+        durationSeconds: Math.min(Math.max(duration, 5), 8), // Veo 3 supports 5-8 seconds
+        personGeneration: "allow_adult"
+      }
     }
 
-    const generateResponse = await fetch('https://api.heygen.com/v2/video/generate', {
-      method: 'POST',
-      headers: {
-        'X-Api-Key': HEYGEN_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(videoData),
-    })
+    console.log("Request body:", JSON.stringify(requestBody))
+
+    const generateResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-preview:predictLongRunning?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      }
+    )
 
     if (!generateResponse.ok) {
       const errorText = await generateResponse.text()
@@ -117,10 +112,10 @@ serve(async (req) => {
     }
 
     const generateData = await generateResponse.json()
-    console.log("Video generation started:", generateData)
+    console.log("Video generation started:", JSON.stringify(generateData))
 
     return new Response(JSON.stringify({ 
-      videoId: generateData.data?.video_id,
+      operationName: generateData.name,
       status: 'pending'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
