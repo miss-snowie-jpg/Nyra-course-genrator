@@ -38,7 +38,7 @@ serve(async (req) => {
       
       if (statusData.done) {
         // Extract video URL from response
-        const generatedVideos = statusData.response?.generateVideoResponse?.generatedSamples
+        const generatedVideos = statusData.response?.generatedVideos
         const videoUri = generatedVideos?.[0]?.video?.uri
         
         return new Response(JSON.stringify({
@@ -73,29 +73,26 @@ serve(async (req) => {
 
     // Extract parameters from request body
     const aspectRatio = body.aspect_ratio || body.aspectRatio || "16:9"
-    const duration = body.duration || 8 // Veo 3 supports 5-8 seconds
+    const duration = body.duration || 8
 
-    console.log("Generating video with Veo 3:", { prompt: body.prompt, aspectRatio, duration })
+    console.log("Generating video with Veo:", { prompt: body.prompt, aspectRatio, duration })
     
-    // Generate video using Veo 3 API
+    // Generate video using Veo API with generateVideos endpoint
     const requestBody = {
-      instances: [
-        {
-          prompt: body.prompt
-        }
-      ],
-      parameters: {
+      prompt: body.prompt,
+      config: {
         aspectRatio: aspectRatio,
-        sampleCount: 1,
-        durationSeconds: Math.min(Math.max(duration, 5), 8), // Veo 3 supports 5-8 seconds
+        numberOfVideos: 1,
+        durationSeconds: Math.min(Math.max(duration, 5), 8),
         personGeneration: "allow_adult"
       }
     }
 
     console.log("Request body:", JSON.stringify(requestBody))
 
+    // Use veo-2.0-generate-001 which is available via Gemini API
     const generateResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-preview:predictLongRunning?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:generateVideos?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: {
