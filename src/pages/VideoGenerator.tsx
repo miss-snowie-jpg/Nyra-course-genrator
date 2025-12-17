@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Sparkles, ArrowLeft, Video, Download, Play, User, Volume2, Monitor, Clock, Loader2, History, Trash2 } from "lucide-react";
+import { Sparkles, ArrowLeft, Video, Download, Play, Monitor, Clock, Loader2, History, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -25,26 +24,9 @@ interface SavedVideo {
   created_at: string;
 }
 
-const AVATARS = [
-  { id: "Kristin_public_2_20240108", name: "Kristin", preview: "Professional Female" },
-  { id: "josh_lite3_20240621", name: "Josh", preview: "Professional Male" },
-  { id: "Angela-inblackskirt-20220820", name: "Angela", preview: "Friendly Female" },
-  { id: "Tyler-incasualsuit-20220721", name: "Tyler", preview: "Casual Male" },
-  { id: "Kayla-incasualsuit-20220818", name: "Kayla", preview: "Elegant Female" },
-  { id: "Eric_public_pro2_20230608", name: "Eric", preview: "Young Male" },
-];
-
-interface Voice {
-  id: string;
-  name: string;
-  language: string;
-  gender: string;
-}
-
 const ASPECT_RATIOS = [
   { id: "16:9", name: "Landscape (16:9)", icon: "🖥️", description: "Best for YouTube, presentations" },
   { id: "9:16", name: "Portrait (9:16)", icon: "📱", description: "Best for TikTok, Reels, Shorts" },
-  { id: "1:1", name: "Square (1:1)", icon: "⬛", description: "Best for Instagram, social posts" },
 ];
 
 const VideoGenerator = () => {
@@ -54,14 +36,10 @@ const VideoGenerator = () => {
   const [progress, setProgress] = useState(0);
   const [savedVideos, setSavedVideos] = useState<SavedVideo[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
-  const [voices, setVoices] = useState<Voice[]>([]);
-  const [loadingVoices, setLoadingVoices] = useState(true);
   const [formData, setFormData] = useState({
     prompt: "",
-    avatar: "Kristin_public_2_20240108",
-    voice: "",
     aspectRatio: "16:9",
-    duration: 30,
+    duration: 8,
   });
 
   useEffect(() => {
@@ -70,26 +48,9 @@ const VideoGenerator = () => {
         navigate('/auth');
       } else {
         fetchVideoHistory();
-        fetchVoices();
       }
     });
   }, [navigate]);
-
-  const fetchVoices = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('list-heygen-voices');
-      if (error) throw error;
-      if (data?.voices && data.voices.length > 0) {
-        setVoices(data.voices);
-        setFormData(prev => ({ ...prev, voice: data.voices[0].id }));
-      }
-    } catch (error) {
-      console.error('Error fetching voices:', error);
-      toast.error("Failed to load voices");
-    } finally {
-      setLoadingVoices(false);
-    }
-  };
 
   const fetchVideoHistory = async () => {
     try {
@@ -121,8 +82,6 @@ const VideoGenerator = () => {
           title,
           prompt: formData.prompt,
           video_url: videoUrl,
-          avatar_id: formData.avatar,
-          voice_id: formData.voice,
           aspect_ratio: formData.aspectRatio,
           duration: formData.duration,
         });
@@ -169,35 +128,32 @@ const VideoGenerator = () => {
     setProgress(0);
     
     try {
-      toast.info("Starting video generation... This may take a few minutes.");
+      toast.info("Starting video generation with Veo 3... This may take a few minutes.");
       
       const { data: startData, error: startError } = await supabase.functions.invoke('generate-video', {
         body: { 
           prompt: formData.prompt,
-          avatar_id: formData.avatar,
-          voice_id: formData.voice,
           aspect_ratio: formData.aspectRatio,
           duration: formData.duration,
         }
       });
 
       if (startError) throw startError;
-      if (!startData?.videoId) throw new Error("Failed to start video generation");
+      if (!startData?.operationName) throw new Error("Failed to start video generation");
 
-      const videoId = startData.videoId;
-      setProgress(10); // Initial progress after generation started
+      const operationName = startData.operationName;
+      setProgress(10);
       
       let attempts = 0;
-      const maxAttempts = 60;
+      const maxAttempts = 120; // Veo 3 can take longer
       
       const checkStatus = async (): Promise<void> => {
         attempts++;
-        // Update progress: start at 10%, go up to 95%
         const estimatedProgress = Math.min(10 + (attempts / maxAttempts) * 85, 95);
         setProgress(estimatedProgress);
         
         const { data: statusData, error: statusError } = await supabase.functions.invoke('generate-video', {
-          body: { videoId }
+          body: { operationName }
         });
 
         if (statusError) throw statusError;
@@ -218,8 +174,7 @@ const VideoGenerator = () => {
         } else if (statusData.status === 'failed' || statusData.error) {
           throw new Error(statusData.error || "Video generation failed");
         } else if (attempts < maxAttempts) {
-          // Poll every 3 seconds for faster feedback
-          setTimeout(checkStatus, 3000);
+          setTimeout(checkStatus, 5000);
         } else {
           throw new Error("Video generation timed out");
         }
@@ -257,9 +212,6 @@ const VideoGenerator = () => {
     }
   };
 
-  const selectedAvatar = AVATARS.find(a => a.id === formData.avatar);
-  const selectedVoice = voices.find(v => v.id === formData.voice);
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -293,80 +245,23 @@ const VideoGenerator = () => {
                     <Video className="w-6 h-6 text-white" />
                   </div>
                   <h2 className="text-2xl font-bold">Create AI Video</h2>
-                  <p className="text-muted-foreground text-sm">Powered by HeyGen</p>
+                  <p className="text-muted-foreground text-sm">Powered by Google Veo 3</p>
                 </div>
 
-                {/* Script Input */}
+                {/* Prompt Input */}
                 <div className="space-y-2">
                   <Label htmlFor="prompt" className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-primary" />
-                    Video Script
+                    Video Description
                   </Label>
                   <Textarea
                     id="prompt"
-                    placeholder="Enter your video script here... The avatar will speak this text."
+                    placeholder="Describe the video you want to create... E.g., 'A golden retriever running through a field of sunflowers at sunset'"
                     value={formData.prompt}
                     onChange={(e) => setFormData({ ...formData, prompt: e.target.value })}
                     className="min-h-28 border-border/50 bg-background/50 resize-none"
                   />
                   <p className="text-xs text-muted-foreground">{formData.prompt.length} characters</p>
-                </div>
-
-                {/* Avatar Selection */}
-                <div className="space-y-3">
-                  <Label className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-primary" />
-                    Select Avatar
-                  </Label>
-                  <RadioGroup
-                    value={formData.avatar}
-                    onValueChange={(value) => setFormData({ ...formData, avatar: value })}
-                    className="grid grid-cols-3 gap-3"
-                  >
-                    {AVATARS.map((avatar) => (
-                      <Label
-                        key={avatar.id}
-                        htmlFor={avatar.id}
-                        className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all hover:scale-105 ${
-                          formData.avatar === avatar.id 
-                            ? 'border-primary bg-primary/10 shadow-lg' 
-                            : 'border-border/50 bg-card/50 hover:border-primary/50'
-                        }`}
-                      >
-                        <RadioGroupItem value={avatar.id} id={avatar.id} className="sr-only" />
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center">
-                          <User className="w-5 h-5 text-primary" />
-                        </div>
-                        <span className="font-medium text-sm">{avatar.name}</span>
-                        <span className="text-xs text-muted-foreground text-center">{avatar.preview}</span>
-                      </Label>
-                    ))}
-                  </RadioGroup>
-                </div>
-
-                {/* Voice Selection */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Volume2 className="h-4 w-4 text-primary" />
-                    Voice
-                  </Label>
-                  <Select value={formData.voice} onValueChange={(value) => setFormData({ ...formData, voice: value })}>
-                    <SelectTrigger className="border-border/50 bg-background/50">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {loadingVoices ? (
-                        <SelectItem value="loading" disabled>Loading voices...</SelectItem>
-                      ) : voices.map((voice) => (
-                        <SelectItem key={voice.id} value={voice.id}>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{voice.name}</span>
-                            <span className="text-muted-foreground text-xs">({voice.language} - {voice.gender})</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
 
                 {/* Aspect Ratio */}
@@ -378,7 +273,7 @@ const VideoGenerator = () => {
                   <RadioGroup
                     value={formData.aspectRatio}
                     onValueChange={(value) => setFormData({ ...formData, aspectRatio: value })}
-                    className="grid grid-cols-3 gap-3"
+                    className="grid grid-cols-2 gap-3"
                   >
                     {ASPECT_RATIOS.map((ratio) => (
                       <Label
@@ -411,15 +306,14 @@ const VideoGenerator = () => {
                   <Slider
                     value={[formData.duration]}
                     onValueChange={(value) => setFormData({ ...formData, duration: value[0] })}
-                    min={10}
-                    max={120}
-                    step={5}
+                    min={5}
+                    max={8}
+                    step={1}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>10s</span>
-                    <span>60s</span>
-                    <span>120s</span>
+                    <span>5s</span>
+                    <span>8s (max)</span>
                   </div>
                 </div>
 
@@ -453,7 +347,7 @@ const VideoGenerator = () => {
                       />
                     </div>
                     <p className="text-xs text-muted-foreground text-center">
-                      This may take 2-5 minutes depending on video length
+                      Veo 3 is generating your video... This may take 2-5 minutes.
                     </p>
                   </div>
                 )}
@@ -461,7 +355,7 @@ const VideoGenerator = () => {
             </Card>
           </div>
 
-          {/* Right Column - Preview Area */}
+          {/* Right Column - Preview */}
           <div className="space-y-6">
             <Card className="border-border/50 bg-card/80 p-6 backdrop-blur-sm">
               <div className="space-y-4">
@@ -469,83 +363,57 @@ const VideoGenerator = () => {
                   <Play className="h-5 w-5 text-primary" />
                   Video Preview
                 </h3>
-
-                {/* Video Player Area */}
+                
                 <div 
-                  className={`relative rounded-xl overflow-hidden bg-gradient-to-br from-muted/50 to-muted flex items-center justify-center ${
-                    formData.aspectRatio === '16:9' ? 'aspect-video' : 
-                    formData.aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[500px]' : 
-                    'aspect-square'
+                  className={`relative rounded-xl overflow-hidden bg-muted/50 flex items-center justify-center ${
+                    formData.aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[500px] mx-auto' : 'aspect-video'
                   }`}
                 >
                   {videoUrl ? (
                     <video 
                       src={videoUrl} 
                       controls 
-                      className="w-full h-full object-contain bg-black rounded-xl"
-                      poster=""
+                      className="w-full h-full object-contain"
+                      autoPlay
                     />
                   ) : (
-                    <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
-                      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-                        <Video className="w-10 h-10 text-primary/50" />
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium">No video yet</p>
-                        <p className="text-sm">Your generated video will appear here</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Loading Overlay */}
-                  {loading && (
-                    <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
-                      <div className="relative">
-                        <div className="w-16 h-16 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
-                        <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-primary" />
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium">Generating your video...</p>
-                        <p className="text-sm text-muted-foreground">{Math.round(progress)}% complete</p>
-                      </div>
+                    <div className="text-center p-8">
+                      <Video className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+                      <p className="text-muted-foreground">
+                        {loading ? "Generating your video..." : "Your generated video will appear here"}
+                      </p>
                     </div>
                   )}
                 </div>
 
-                {/* Download Button */}
                 {videoUrl && (
-                  <Button 
-                    size="lg"
-                    variant="outline" 
-                    className="w-full border-primary/50 hover:bg-primary/10"
+                  <Button
+                    variant="outline"
+                    className="w-full"
                     onClick={handleDownload}
                   >
-                    <Download className="mr-2 h-5 w-5" />
+                    <Download className="mr-2 h-4 w-4" />
                     Download Video
                   </Button>
                 )}
+              </div>
+            </Card>
 
-                {/* Current Settings Summary */}
-                <div className="rounded-xl bg-muted/30 p-4 space-y-3">
-                  <h4 className="font-medium text-sm text-muted-foreground">Current Settings</h4>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-primary" />
-                      <span>{selectedAvatar?.name || 'None'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Volume2 className="h-4 w-4 text-primary" />
-                      <span>{selectedVoice?.name || 'None'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Monitor className="h-4 w-4 text-primary" />
-                      <span>{formData.aspectRatio}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-primary" />
-                      <span>{formData.duration}s</span>
-                    </div>
-                  </div>
+            {/* Settings Summary */}
+            <Card className="border-border/50 bg-card/80 p-4 backdrop-blur-sm">
+              <h4 className="font-semibold mb-3 text-sm">Current Settings</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Aspect Ratio</span>
+                  <span>{formData.aspectRatio}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Duration</span>
+                  <span>{formData.duration} seconds</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Model</span>
+                  <span>Google Veo 3</span>
                 </div>
               </div>
             </Card>
@@ -553,92 +421,75 @@ const VideoGenerator = () => {
         </div>
 
         {/* Video History Section */}
-        <Card className="mt-8 border-border/50 bg-card/80 p-6 backdrop-blur-sm">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <History className="h-5 w-5 text-primary" />
-              Video History
-              <span className="text-sm font-normal text-muted-foreground">
-                ({savedVideos.length} video{savedVideos.length !== 1 ? 's' : ''})
-              </span>
-            </h3>
-
-            {loadingHistory ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            ) : savedVideos.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                <Video className="h-12 w-12 mb-3 opacity-50" />
-                <p className="font-medium">No videos yet</p>
-                <p className="text-sm">Your generated videos will appear here</p>
-              </div>
-            ) : (
-              <ScrollArea className="h-[300px]">
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pr-4">
-                  {savedVideos.map((video) => {
-                    const avatarInfo = AVATARS.find(a => a.id === video.avatar_id);
-                    const voiceInfo = voices.find(v => v.id === video.voice_id);
-                    
-                    return (
-                      <div 
-                        key={video.id}
-                        className="group relative rounded-xl border border-border/50 bg-card/50 overflow-hidden hover:border-primary/50 transition-all"
-                      >
-                        {/* Video Thumbnail */}
-                        <div className="aspect-video bg-gradient-to-br from-muted/50 to-muted flex items-center justify-center">
-                          <video 
-                            src={video.video_url} 
-                            className="w-full h-full object-cover"
-                            preload="metadata"
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="gap-2"
-                              onClick={() => playFromHistory(video)}
-                            >
-                              <Play className="h-4 w-4" />
-                              Play
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        {/* Video Info */}
-                        <div className="p-3 space-y-2">
-                          <p className="font-medium text-sm line-clamp-2" title={video.prompt}>
-                            {video.title}
-                          </p>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              <span>{avatarInfo?.name || 'Unknown'}</span>
-                            </div>
-                            <span>{video.aspect_ratio || '16:9'}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(video.created_at).toLocaleDateString()}
-                            </span>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                              onClick={() => deleteVideo(video.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            )}
+        <div className="mt-12">
+          <div className="flex items-center gap-3 mb-6">
+            <History className="h-6 w-6 text-primary" />
+            <h2 className="text-2xl font-bold">Video History</h2>
           </div>
-        </Card>
+          
+          {loadingHistory ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : savedVideos.length === 0 ? (
+            <Card className="border-border/50 bg-card/80 p-8 text-center backdrop-blur-sm">
+              <Video className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+              <p className="text-muted-foreground">No videos generated yet. Create your first video above!</p>
+            </Card>
+          ) : (
+            <ScrollArea className="w-full">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {savedVideos.map((video) => (
+                  <Card 
+                    key={video.id} 
+                    className="border-border/50 bg-card/80 overflow-hidden backdrop-blur-sm group hover:border-primary/50 transition-colors"
+                  >
+                    <div 
+                      className={`relative bg-muted/50 cursor-pointer ${
+                        video.aspect_ratio === '9:16' ? 'aspect-[9/16]' : 'aspect-video'
+                      }`}
+                      onClick={() => playFromHistory(video)}
+                    >
+                      <div className="absolute inset-0 flex items-center justify-center bg-background/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Play className="w-12 h-12 text-primary" />
+                      </div>
+                      <video 
+                        src={video.video_url} 
+                        className="w-full h-full object-cover"
+                        muted
+                      />
+                    </div>
+                    <div className="p-3">
+                      <p className="font-medium text-sm truncate">{video.title}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(video.created_at).toLocaleDateString()}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="flex-1 h-8"
+                          onClick={() => playFromHistory(video)}
+                        >
+                          <Play className="h-3 w-3 mr-1" />
+                          Play
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 text-destructive hover:text-destructive"
+                          onClick={() => deleteVideo(video.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
       </main>
     </div>
   );
