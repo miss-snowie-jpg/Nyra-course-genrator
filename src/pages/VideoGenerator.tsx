@@ -1,12 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Slider } from "@/components/ui/slider";
-import { Sparkles, ArrowLeft, Video, Download, Play, Monitor, Clock, Loader2, History, Trash2 } from "lucide-react";
+import { Sparkles, ArrowLeft, Video, Download, Play, Monitor, Loader2, History, Trash2, Image, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -31,15 +30,18 @@ const ASPECT_RATIOS = [
 
 const VideoGenerator = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [savedVideos, setSavedVideos] = useState<SavedVideo[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [formData, setFormData] = useState({
     prompt: "",
     aspectRatio: "16:9",
-    duration: 8,
   });
 
   useEffect(() => {
@@ -83,7 +85,6 @@ const VideoGenerator = () => {
           prompt: formData.prompt,
           video_url: videoUrl,
           aspect_ratio: formData.aspectRatio,
-          duration: formData.duration,
         });
 
       if (error) throw error;
@@ -117,9 +118,57 @@ const VideoGenerator = () => {
     toast.success("Playing video from history");
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be less than 10MB");
+      return;
+    }
+
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const uploadImageToDataUrl = async (): Promise<string> => {
+    if (!imageFile) throw new Error("No image selected");
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        resolve(e.target?.result as string);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(imageFile);
+    });
+  };
+
   const handleGenerate = async () => {
     if (!formData.prompt.trim()) {
       toast.error("Please enter a video description");
+      return;
+    }
+
+    if (!imageFile) {
+      toast.error("Please upload an image to animate");
       return;
     }
 
@@ -128,24 +177,29 @@ const VideoGenerator = () => {
     setProgress(0);
     
     try {
-      toast.info("Starting video generation with Veo 3... This may take a few minutes.");
+      toast.info("Starting video generation with SkyReels V1... This may take a few minutes.");
       
+      setUploadingImage(true);
+      const imageDataUrl = await uploadImageToDataUrl();
+      setUploadingImage(false);
+      setProgress(5);
+
       const { data: startData, error: startError } = await supabase.functions.invoke('generate-video', {
         body: { 
           prompt: formData.prompt,
+          image_url: imageDataUrl,
           aspect_ratio: formData.aspectRatio,
-          duration: formData.duration,
         }
       });
 
       if (startError) throw startError;
-      if (!startData?.operationName) throw new Error("Failed to start video generation");
+      if (!startData?.requestId) throw new Error("Failed to start video generation");
 
-      const operationName = startData.operationName;
+      const requestId = startData.requestId;
       setProgress(10);
       
       let attempts = 0;
-      const maxAttempts = 120; // Veo 3 can take longer
+      const maxAttempts = 120;
       
       const checkStatus = async (): Promise<void> => {
         attempts++;
@@ -153,7 +207,7 @@ const VideoGenerator = () => {
         setProgress(estimatedProgress);
         
         const { data: statusData, error: statusError } = await supabase.functions.invoke('generate-video', {
-          body: { operationName }
+          body: { requestId }
         });
 
         if (statusError) throw statusError;
@@ -187,6 +241,7 @@ const VideoGenerator = () => {
       toast.error(error.message || "Failed to generate video");
       setLoading(false);
       setProgress(0);
+      setUploadingImage(false);
     }
   };
 
@@ -245,18 +300,61 @@ const VideoGenerator = () => {
                     <Video className="w-6 h-6 text-white" />
                   </div>
                   <h2 className="text-2xl font-bold">Create AI Video</h2>
-                  <p className="text-muted-foreground text-sm">Powered by Google Veo 3</p>
+                  <p className="text-muted-foreground text-sm">Powered by SkyReels V1 (Image-to-Video)</p>
+                </div>
+
+                {/* Image Upload */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <Image className="h-4 w-4 text-primary" />
+                    Source Image
+                  </Label>
+                  
+                  {imagePreview ? (
+                    <div className="relative rounded-xl overflow-hidden border-2 border-primary/50 bg-muted/50">
+                      <img 
+                        src={imagePreview} 
+                        alt="Selected image" 
+                        className="w-full h-48 object-cover"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2"
+                        onClick={removeImage}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div 
+                      className="border-2 border-dashed border-border/50 rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 transition-colors bg-muted/20"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-sm text-muted-foreground">Click to upload an image</p>
+                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP up to 10MB</p>
+                    </div>
+                  )}
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
                 </div>
 
                 {/* Prompt Input */}
                 <div className="space-y-2">
                   <Label htmlFor="prompt" className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-primary" />
-                    Video Description
+                    Animation Description
                   </Label>
                   <Textarea
                     id="prompt"
-                    placeholder="Describe the video you want to create... E.g., 'A golden retriever running through a field of sunflowers at sunset'"
+                    placeholder="Describe how you want the image to animate... E.g., 'The woman walks confidently down the street, her hair flowing in the wind'"
                     value={formData.prompt}
                     onChange={(e) => setFormData({ ...formData, prompt: e.target.value })}
                     className="min-h-28 border-border/50 bg-background/50 resize-none"
@@ -294,40 +392,17 @@ const VideoGenerator = () => {
                   </RadioGroup>
                 </div>
 
-                {/* Duration Slider */}
-                <div className="space-y-4">
-                  <Label className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-primary" />
-                      Duration
-                    </span>
-                    <span className="text-primary font-bold">{formData.duration}s</span>
-                  </Label>
-                  <Slider
-                    value={[formData.duration]}
-                    onValueChange={(value) => setFormData({ ...formData, duration: value[0] })}
-                    min={5}
-                    max={8}
-                    step={1}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>5s</span>
-                    <span>8s (max)</span>
-                  </div>
-                </div>
-
                 {/* Generate Button */}
                 <Button
                   size="lg"
                   className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
                   onClick={handleGenerate}
-                  disabled={loading || !formData.prompt.trim()}
+                  disabled={loading || !formData.prompt.trim() || !imageFile}
                 >
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Generating... {Math.round(progress)}%
+                      {uploadingImage ? 'Uploading...' : `Generating... ${Math.round(progress)}%`}
                     </>
                   ) : (
                     <>
@@ -347,7 +422,7 @@ const VideoGenerator = () => {
                       />
                     </div>
                     <p className="text-xs text-muted-foreground text-center">
-                      Veo 3 is generating your video... This may take 2-5 minutes.
+                      SkyReels is animating your image... This may take 1-3 minutes.
                     </p>
                   </div>
                 )}
@@ -408,12 +483,12 @@ const VideoGenerator = () => {
                   <span>{formData.aspectRatio}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Duration</span>
-                  <span>{formData.duration} seconds</span>
+                  <span className="text-muted-foreground">Model</span>
+                  <span>SkyReels V1</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Model</span>
-                  <span>Google Veo 3</span>
+                  <span className="text-muted-foreground">Image</span>
+                  <span>{imageFile ? '✓ Selected' : 'Not selected'}</span>
                 </div>
               </div>
             </Card>
@@ -453,32 +528,22 @@ const VideoGenerator = () => {
                       <div className="absolute inset-0 flex items-center justify-center bg-background/50 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Play className="w-12 h-12 text-primary" />
                       </div>
-                      <video 
-                        src={video.video_url} 
-                        className="w-full h-full object-cover"
-                        muted
-                      />
+                      <Video className="w-8 h-8 text-muted-foreground/30 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                     </div>
                     <div className="p-3">
-                      <p className="font-medium text-sm truncate">{video.title}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(video.created_at).toLocaleDateString()}
-                      </p>
-                      <div className="flex items-center gap-2 mt-2">
+                      <p className="text-sm font-medium truncate">{video.title}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(video.created_at).toLocaleDateString()}
+                        </span>
                         <Button
-                          size="sm"
                           variant="ghost"
-                          className="flex-1 h-8"
-                          onClick={() => playFromHistory(video)}
-                        >
-                          <Play className="h-3 w-3 mr-1" />
-                          Play
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 text-destructive hover:text-destructive"
-                          onClick={() => deleteVideo(video.id)}
+                          size="icon"
+                          className="h-6 w-6 text-destructive hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteVideo(video.id);
+                          }}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>

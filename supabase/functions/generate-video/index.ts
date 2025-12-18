@@ -11,20 +11,25 @@ serve(async (req) => {
   }
 
   try {
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-    if (!GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY is not set')
+    const FAL_API_KEY = Deno.env.get('FAL_API_KEY')
+    if (!FAL_API_KEY) {
+      throw new Error('FAL_API_KEY is not set')
     }
 
     const body = await req.json()
 
     // If it's a status check request
-    if (body.operationName) {
-      console.log("Checking status for operation:", body.operationName)
+    if (body.requestId) {
+      console.log("Checking status for request:", body.requestId)
       
       const statusResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/${body.operationName}?key=${GEMINI_API_KEY}`,
-        { method: 'GET' }
+        `https://queue.fal.run/fal-ai/skyreels-i2v/requests/${body.requestId}/status`,
+        { 
+          method: 'GET',
+          headers: {
+            'Authorization': `Key ${FAL_API_KEY}`,
+          }
+        }
       )
 
       if (!statusResponse.ok) {
@@ -36,15 +41,35 @@ serve(async (req) => {
       const statusData = await statusResponse.json()
       console.log("Status check response:", JSON.stringify(statusData))
       
-      if (statusData.done) {
-        // Extract video URL from response
-        const generatedVideos = statusData.response?.generatedVideos
-        const videoUri = generatedVideos?.[0]?.video?.uri
+      if (statusData.status === 'COMPLETED') {
+        // Fetch the result
+        const resultResponse = await fetch(
+          `https://queue.fal.run/fal-ai/skyreels-i2v/requests/${body.requestId}`,
+          { 
+            method: 'GET',
+            headers: {
+              'Authorization': `Key ${FAL_API_KEY}`,
+            }
+          }
+        )
+
+        if (!resultResponse.ok) {
+          throw new Error('Failed to fetch result')
+        }
+
+        const resultData = await resultResponse.json()
+        console.log("Result data:", JSON.stringify(resultData))
         
         return new Response(JSON.stringify({
           status: 'completed',
-          video_url: videoUri ? `${videoUri}&key=${GEMINI_API_KEY}` : null,
-          error: statusData.error?.message
+          video_url: resultData.video?.url || null,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      } else if (statusData.status === 'FAILED') {
+        return new Response(JSON.stringify({
+          status: 'failed',
+          error: statusData.error || 'Video generation failed',
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -52,7 +77,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({
           status: 'processing',
           video_url: null,
-          metadata: statusData.metadata
+          queue_position: statusData.queue_position,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -71,31 +96,39 @@ serve(async (req) => {
       )
     }
 
+    if (!body.image_url) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Missing required field: image_url is required for SkyReels image-to-video" 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      )
+    }
+
     // Extract parameters from request body
     const aspectRatio = body.aspect_ratio || body.aspectRatio || "16:9"
-    const duration = body.duration || 8
 
-    console.log("Generating video with Veo:", { prompt: body.prompt, aspectRatio, duration })
+    console.log("Generating video with SkyReels V1:", { prompt: body.prompt, imageUrl: body.image_url, aspectRatio })
     
-    // Generate video using Veo API with generateVideos endpoint
+    // Generate video using SkyReels I2V API via queue
     const requestBody = {
       prompt: body.prompt,
-      config: {
-        aspectRatio: aspectRatio,
-        numberOfVideos: 1,
-        durationSeconds: Math.min(Math.max(duration, 5), 8),
-        personGeneration: "allow_adult"
-      }
+      image_url: body.image_url,
+      aspect_ratio: aspectRatio,
+      guidance_scale: 6,
+      num_inference_steps: 30,
     }
 
     console.log("Request body:", JSON.stringify(requestBody))
 
-    // Use veo-2.0-generate-001 which is available via Gemini API
     const generateResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:generateVideos?key=${GEMINI_API_KEY}`,
+      'https://queue.fal.run/fal-ai/skyreels-i2v',
       {
         method: 'POST',
         headers: {
+          'Authorization': `Key ${FAL_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
@@ -105,14 +138,14 @@ serve(async (req) => {
     if (!generateResponse.ok) {
       const errorText = await generateResponse.text()
       console.error("Generation error:", generateResponse.status, errorText)
-      throw new Error(`Failed to generate video: ${generateResponse.status} - ${errorText}`)
+      throw new Error(`Failed to start video generation: ${generateResponse.status} - ${errorText}`)
     }
 
     const generateData = await generateResponse.json()
     console.log("Video generation started:", JSON.stringify(generateData))
 
     return new Response(JSON.stringify({ 
-      operationName: generateData.name,
+      requestId: generateData.request_id,
       status: 'pending'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
