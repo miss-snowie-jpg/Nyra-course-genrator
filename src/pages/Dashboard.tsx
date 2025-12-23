@@ -127,17 +127,17 @@ const Dashboard = () => {
           <Card className="border-accent/30 bg-gradient-to-br from-accent/10 via-card to-primary/10 p-8 text-center">
             <div className="mx-auto max-w-xl">
               <Video className="mx-auto mb-4 h-12 w-12 text-accent" />
-              <h2 className="mb-4 text-2xl font-bold">Generate Video</h2>
+              <h2 className="mb-4 text-2xl font-bold">Ad Videos</h2>
               <p className="mb-6 text-muted-foreground">
-                Create professional videos with AI to enhance your courses.
+                Browse curated ad videos tailored for course sellers.
               </p>
               <Button 
                 size="lg" 
                 className="w-full bg-gradient-to-r from-accent to-primary"
-                onClick={() => navigate('/video-generator')}
+                onClick={() => navigate('/ad-videos')}
               >
                 <Video className="mr-2 h-5 w-5" />
-                Video Generator
+                Ad Videos
               </Button>
             </div>
           </Card>
