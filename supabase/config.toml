@@ -6,9 +6,6 @@ verify_jwt = true
 [functions.generate-course-website]
 verify_jwt = true
 
-[functions.generate-video]
-verify_jwt = true
-
 [functions.list-heygen-voices]
 verify_jwt = false
 

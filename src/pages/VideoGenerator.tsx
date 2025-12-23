@@ -42,6 +42,7 @@ const VideoGenerator = () => {
   const [formData, setFormData] = useState({
     prompt: "",
     aspectRatio: "16:9",
+    provider: "client",
   });
 
   useEffect(() => {
@@ -161,6 +162,139 @@ const VideoGenerator = () => {
     });
   };
 
+  const promptToAnimationOptions = (prompt: string) => {
+    const base = Math.max(4, Math.min(10, Math.floor(prompt.length / 40) + 4));
+    const duration = base; // seconds
+    const intensity = /fast|quick|energetic|dramatic/i.test(prompt) ? 0.18 : 0.08;
+    return { duration, intensity };
+  }
+
+  const generateClientVideo = async (file: File, prompt: string, aspectRatio: string): Promise<Blob> => {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = (e) => resolve(e.target?.result as string);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = dataUrl;
+    });
+
+    const { duration, intensity } = promptToAnimationOptions(prompt);
+    const fps = 30;
+    const width = aspectRatio === '9:16' ? 720 : 1280;
+    const height = aspectRatio === '9:16' ? 1280 : 720;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas not available');
+
+    // capture stream
+    const stream = (canvas as any).captureStream?.(fps) as MediaStream | undefined;
+    if (!stream) throw new Error('Browser does not support canvas.captureStream');
+
+    const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+    const recorder = new MediaRecorder(stream, { mimeType: mime });
+    const chunks: BlobPart[] = [];
+    recorder.ondataavailable = (e) => { if (e.data?.size) chunks.push(e.data); };
+
+    const stopPromise = new Promise<Blob>((resolve) => {
+      recorder.onstop = () => resolve(new Blob(chunks, { type: mime }));
+    });
+
+    recorder.start();
+
+    const start = performance.now();
+    const end = start + duration * 1000;
+
+    function drawFrame(now: number) {
+      const t = Math.min(1, (now - start) / (duration * 1000));
+      // ease in-out
+      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      const scale = 1 + intensity * (0.5 - Math.abs(0.5 - ease)) * 2;
+      const angle = (ease - 0.5) * 0.06; // subtle rotation
+      const dx = (ease - 0.5) * width * 0.06;
+      const dy = (ease - 0.5) * height * 0.03;
+
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, width, height);
+      ctx.save();
+      ctx.translate(width / 2 + dx, height / 2 + dy);
+      ctx.rotate(angle);
+      ctx.scale(scale, scale);
+
+      // draw the image as cover
+      const iw = img.width;
+      const ih = img.height;
+      const ir = iw / ih;
+      const cr = width / height;
+      let dw = width, dh = height;
+      if (ir > cr) {
+        dh = height;
+        dw = height * ir;
+      } else {
+        dw = width;
+        dh = width / ir;
+      }
+      ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+      ctx.restore();
+
+      if (now < end) {
+        requestAnimationFrame(drawFrame);
+      } else {
+        recorder.stop();
+      }
+    }
+
+    requestAnimationFrame(drawFrame);
+    const blob = await stopPromise;
+    return blob;
+  }
+
+  const uploadBlobToStorageAndSaveHistory = async (blob: Blob): Promise<string> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const fileName = `video-${Date.now()}.webm`;
+
+      if (!session) {
+        const localUrl = URL.createObjectURL(blob);
+        await saveVideoToHistory(localUrl);
+        return localUrl;
+      }
+
+      const path = `${session.user.id}/${fileName}`;
+      const { error: uploadError } = await supabase.storage.from('videos').upload(path, blob, { contentType: 'video/webm' });
+      if (uploadError) {
+        console.warn('Storage upload failed:', uploadError);
+        const localUrl = URL.createObjectURL(blob);
+        await saveVideoToHistory(localUrl);
+        return localUrl;
+      }
+
+      const { data: publicData } = await supabase.storage.from('videos').getPublicUrl(path);
+      const publicUrl = (publicData as any)?.publicUrl;
+      if (publicUrl) {
+        await saveVideoToHistory(publicUrl);
+        return publicUrl;
+      }
+
+      const localUrl = URL.createObjectURL(blob);
+      await saveVideoToHistory(localUrl);
+      return localUrl;
+    } catch (err) {
+      console.error('Error uploading video blob:', err);
+      const localUrl = URL.createObjectURL(blob);
+      await saveVideoToHistory(localUrl);
+      return localUrl;
+    }
+  };
+
   const handleGenerate = async () => {
     if (!formData.prompt.trim()) {
       toast.error("Please enter a video description");
@@ -177,6 +311,26 @@ const VideoGenerator = () => {
     setProgress(0);
     
     try {
+      if (formData.provider === 'client') {
+        toast.info('Generating video in your browser (no payment required)...')
+        setUploadingImage(true);
+        const blob = await generateClientVideo(imageFile, formData.prompt, formData.aspectRatio);
+        setUploadingImage(false);
+        setProgress(50);
+
+        const url = URL.createObjectURL(blob);
+        setVideoUrl(url);
+        setProgress(80);
+        toast.success('Video generated locally! Saving...');
+
+        await uploadBlobToStorageAndSaveHistory(blob);
+        setProgress(100);
+        toast.success('Video saved to history');
+        setLoading(false);
+        return;
+      }
+
+      // existing server-based flow (SkyReels / Fal)
       toast.info("Starting video generation with SkyReels V1... This may take a few minutes.");
       
       setUploadingImage(true);
@@ -238,7 +392,27 @@ const VideoGenerator = () => {
       
     } catch (error: any) {
       console.error('Video generation error:', error);
-      toast.error(error.message || "Failed to generate video");
+      const raw = error?.message || String(error) || "Failed to generate video";
+      let friendly = "Failed to generate video";
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed.error_code === 'config_error') {
+          friendly = 'Server configuration error. Contact the site administrator.'
+        } else if (parsed.error_code === 'internal_server_error') {
+          friendly = parsed.error_id ? `Server error occurred (id: ${parsed.error_id}). Contact support.` : 'Server error occurred. Contact support.'
+        } else if (parsed.error_code === 'provider_account_issue' || /provider_account_issue|provider|balance|account|billing|credit|quota/i.test(parsed.error || '')) {
+          friendly = 'Video generation temporarily unavailable due to provider account issue. Try again later.'
+        } else if (parsed.error) {
+          friendly = parsed.error
+        }
+      } catch (_) {
+        if (/provider_account_issue|provider|balance|account|billing|credit|quota/i.test(raw)) {
+          friendly = "Video generation temporarily unavailable due to provider account issue. Try again later.";
+        } else {
+          friendly = raw;
+        }
+      }
+      toast.error(friendly);
       setLoading(false);
       setProgress(0);
       setUploadingImage(false);
@@ -300,7 +474,7 @@ const VideoGenerator = () => {
                     <Video className="w-6 h-6 text-white" />
                   </div>
                   <h2 className="text-2xl font-bold">Create AI Video</h2>
-                  <p className="text-muted-foreground text-sm">Powered by SkyReels V1 (Image-to-Video)</p>
+                  <p className="text-muted-foreground text-sm">{formData.provider === 'client' ? 'Rendered in browser (no-pay, limited quality)' : 'Powered by SkyReels V1 (Image-to-Video)'}</p>
                 </div>
 
                 {/* Image Upload */}
@@ -392,6 +566,30 @@ const VideoGenerator = () => {
                   </RadioGroup>
                 </div>
 
+                {/* Provider */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <Monitor className="h-4 w-4 text-primary" />
+                    Provider
+                  </Label>
+                  <RadioGroup
+                    value={formData.provider}
+                    onValueChange={(value) => setFormData({ ...formData, provider: value })}
+                    className="grid grid-cols-2 gap-3"
+                  >
+                    <Label className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 cursor-pointer transition-all hover:scale-105 ${formData.provider === 'client' ? 'border-primary bg-primary/10 shadow-lg' : 'border-border/50 bg-card/50 hover:border-primary/50'}`}>
+                      <RadioGroupItem value="client" id="provider-client" className="sr-only" />
+                      <span className="font-medium text-sm">Client (No-pay)</span>
+                      <span className="text-xs text-muted-foreground text-center">Runs in the browser; unlimited, lower fidelity</span>
+                    </Label>
+                    <Label className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 cursor-pointer transition-all hover:scale-105 ${formData.provider === 'fal' ? 'border-primary bg-primary/10 shadow-lg' : 'border-border/50 bg-card/50 hover:border-primary/50'}`}>
+                      <RadioGroupItem value="fal" id="provider-fal" className="sr-only" />
+                      <span className="font-medium text-sm">SkyReels (Fal)</span>
+                      <span className="text-xs text-muted-foreground text-center">Higher fidelity cloud model (may have quotas)</span>
+                    </Label>
+                  </RadioGroup>
+                </div>
+
                 {/* Generate Button */}
                 <Button
                   size="lg"
@@ -422,7 +620,7 @@ const VideoGenerator = () => {
                       />
                     </div>
                     <p className="text-xs text-muted-foreground text-center">
-                      SkyReels is animating your image... This may take 1-3 minutes.
+                      {formData.provider === 'client' ? 'Rendering in your browser... This may take a few seconds.' : 'SkyReels is animating your image... This may take 1-3 minutes.'}
                     </p>
                   </div>
                 )}
@@ -483,8 +681,8 @@ const VideoGenerator = () => {
                   <span>{formData.aspectRatio}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Model</span>
-                  <span>SkyReels V1</span>
+                  <span className="text-muted-foreground">Provider</span>
+                  <span>{formData.provider === 'client' ? 'Client (no-pay)' : formData.provider === 'fal' ? 'SkyReels V1' : formData.provider}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Image</span>
