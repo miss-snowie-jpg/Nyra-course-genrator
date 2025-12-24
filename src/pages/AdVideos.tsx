@@ -2,46 +2,110 @@ import React, { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 type Video = {
   id: string;
   title: string;
   description: string;
+  thumbnail?: string;
   category?: string;
 };
 
-const videos: Video[] = [
-  { id: "dQw4w9WgXcQ", title: "Course Promo Sample 1", description: "Short ad style course promo", category: "General" },
-  { id: "3JZ_D3ELwOQ", title: "Course Promo Sample 2", description: "High-energy ad", category: "General" },
-  { id: "l9nh1l8ZIJQ", title: "Course Promo Sample 3", description: "Narrative-driven teaser", category: "General" },
-  { id: "L_jWHffIx5E", title: "Course Promo Sample 4", description: "Testimonial style ad", category: "General" },
-  { id: "eY52Zsg-KVI", title: "Course Promo Sample 5", description: "Minimal text ad", category: "General" },
-  { id: "V-_O7nl0Ii0", title: "Course Promo Sample 6", description: "Animated explainer ad", category: "Explainer" },
-  { id: "kXYiU_JCYtU", title: "Course Promo Sample 7", description: "Bold headline ad", category: "General" },
-  { id: "9bZkp7q19f0", title: "Rich Lifestyle Montage", description: "Fast-paced lifestyle montage with luxury visuals", category: "Lifestyle" },
+// Curated fallback list (kept small as a fallback)
+const curated: Video[] = [
+  { id: "9bZkp7q19f0", title: "Rich Lifestyle Montage", description: "Fast-paced lifestyle montage with premium visuals", category: "Lifestyle" },
   { id: "RgKAFK5djSk", title: "Stylish Lifestyle Ad", description: "A lifestyle-focused ad with premium vibes", category: "Lifestyle" },
   { id: "60ItHLz5WEA", title: "Aspirational Travel Ad", description: "Adventure and high-end travel visuals", category: "Lifestyle" },
-  { id: "hT_nvWreIhg", title: "Emotional Story Promo", description: "Emotional story ad", category: "General" },
-  { id: "fJ9rUzIMcZQ", title: "Cinematic Promo", description: "Cinematic course promo", category: "General" },
-  // Additional rich/lifestyle-focused entries
-  { id: "V-_O7nl0Ii0", title: "Rich Lifestyle Promo 1", description: "Luxury product and lifestyle montage", category: "Lifestyle" },
-  { id: "kXYiU_JCYtU", title: "Rich Lifestyle Promo 2", description: "Premium lifestyle shots and aspirational voiceover", category: "Lifestyle" },
-  { id: "eY52Zsg-KVI", title: "Rich Lifestyle Promo 3", description: "Minimal, elegant ad focusing on lifestyle benefits", category: "Lifestyle" },
+  { id: "kXYiU_JCYtU", title: "Bold Headline Ad", description: "Bold, energetic promo", category: "General" },
 ];
 
+const getApiKey = () => import.meta.env.VITE_YOUTUBE_API_KEY || localStorage.getItem("youtube_api_key") || "";
+
 const AdVideos = () => {
-  const [category, setCategory] = useState<string>("All");
+  const [useDynamic, setUseDynamic] = useState<boolean>(true);
+  const [query, setQuery] = useState<string>("course promo lifestyle");
+  const [results, setResults] = useState<Video[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [apiKeyInput, setApiKeyInput] = useState<string>(localStorage.getItem("youtube_api_key") || "");
+  const [pageToken, setPageToken] = useState<string | null>(null);
+  const [prevPageToken, setPrevPageToken] = useState<string | null>(null);
 
-  const categories = useMemo(() => {
-    const cats = new Set<string>();
-    videos.forEach((v) => cats.add(v.category ?? "General"));
-    return ["All", ...Array.from(cats)];
-  }, []);
+  const categories = useMemo(() => ["All", "Lifestyle", "General", "Explainer"], []);
+  const [activeCategory, setActiveCategory] = useState<string>("All");
 
-  const filtered = useMemo(() => {
-    if (category === "All") return videos;
-    return videos.filter((v) => (v.category ?? "General") === category);
-  }, [category]);
+  const fetchVideos = async (opts?: { q?: string; token?: string }) => {
+    const key = getApiKey();
+    if (!key) {
+      setError("YouTube API key not set. Add it via VITE_YOUTUBE_API_KEY or enter it below.");
+      setResults([]);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({
+        key,
+        part: "snippet",
+        q: opts?.q ?? query,
+        maxResults: "12",
+        type: "video",
+      });
+      if (opts?.token) params.set("pageToken", opts.token);
+
+      const url = `https://www.googleapis.com/youtube/v3/search?${params.toString()}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`YouTube API error: ${res.status}`);
+      const data = await res.json();
+
+      const vids: Video[] = (data.items || []).map((it: any) => ({
+        id: it.id.videoId,
+        title: it.snippet.title,
+        description: it.snippet.description,
+        thumbnail: it.snippet.thumbnails?.medium?.url ?? it.snippet.thumbnails?.default?.url,
+        category: it.snippet.title.toLowerCase().includes("lifestyle") || it.snippet.description.toLowerCase().includes("lifestyle") ? "Lifestyle" : "General",
+      }));
+
+      setResults(vids);
+      setPrevPageToken(data.prevPageToken ?? null);
+      setPageToken(data.nextPageToken ?? null);
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to fetch videos");
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onSearch = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setPageToken(null);
+    setPrevPageToken(null);
+    fetchVideos({ q: query });
+  };
+
+  const onNext = () => {
+    if (!pageToken) return;
+    fetchVideos({ token: pageToken });
+  };
+  const onPrev = () => {
+    if (!prevPageToken) return;
+    fetchVideos({ token: prevPageToken });
+  };
+
+  const saveApiKey = () => {
+    localStorage.setItem("youtube_api_key", apiKeyInput.trim());
+    setError(null);
+  };
+
+  const shown = useMemo(() => {
+    let base = useDynamic ? results : curated;
+    if (activeCategory === "All") return base;
+    return base.filter((v) => (v.category ?? "General") === activeCategory);
+  }, [useDynamic, results, activeCategory]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -52,49 +116,81 @@ const AdVideos = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <p className="mb-6 text-muted-foreground">Curated collection of ad-style videos suitable for promoting courses. Use the filters to show Lifestyle-focused videos tailored for course sellers.</p>
+        <p className="mb-4 text-muted-foreground">Search YouTube for course promo and lifestyle ads. Results are loaded 12 per page and support pagination.</p>
 
-        <div className="mb-6 flex gap-2">
-          {categories.map((c) => (
-            <button
-              key={c}
-              onClick={() => setCategory(c)}
-              className={`rounded-full px-3 py-1 text-sm ${category === c ? 'bg-primary text-white' : 'bg-muted/10 text-muted-foreground'}`}
-            >
-              {c}
-            </button>
-          ))}
+        <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <form onSubmit={onSearch} className="flex gap-2 w-full md:max-w-xl">
+            <Input value={query} onChange={(e) => setQuery((e.target as HTMLInputElement).value)} placeholder="Search e.g. 'course promo lifestyle'" />
+            <Button type="submit" className="whitespace-nowrap">Search</Button>
+            <Button variant={useDynamic ? "ghost" : "secondary"} onClick={() => { setUseDynamic(!useDynamic); setResults([]); }}>
+              {useDynamic ? 'Using YouTube API' : 'Using curated list'}
+            </Button>
+          </form>
+
+          <div className="flex items-center gap-2">
+            <div className="text-sm text-muted-foreground">Category:</div>
+            <div className="flex gap-2">
+              {categories.map((c) => (
+                <button key={c} className={`rounded-full px-3 py-1 text-sm ${activeCategory === c ? 'bg-primary text-white' : 'bg-muted/10 text-muted-foreground'}`} onClick={() => setActiveCategory(c)}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
+        {!getApiKey() && (
+          <div className="mb-6 rounded-md border border-border p-4">
+            <p className="text-sm mb-2">No YouTube API key found. You can set <code>VITE_YOUTUBE_API_KEY</code> in your environment or enter a key below (stored locally).</p>
+            <div className="flex gap-2">
+              <Input value={apiKeyInput} onChange={(e) => setApiKeyInput((e.target as HTMLInputElement).value)} placeholder="Enter YouTube API key" />
+              <Button onClick={saveApiKey}>Save key locally</Button>
+            </div>
+          </div>
+        )}
+
+        {error && <div className="mb-4 text-sm text-red-500">{error}</div>}
+
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((v) => (
-            <Card key={`${v.id}-${v.title}`} className="p-0 overflow-hidden">
-              <div className="aspect-video w-full">
-                <iframe
-                  className="w-full h-full"
-                  src={`https://www.youtube.com/embed/${v.id}`}
-                  title={v.title}
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="mb-1 text-lg font-semibold">{v.title}</h3>
-                  <span className="text-xs rounded-full bg-muted/10 px-2 py-1">{v.category ?? 'General'}</span>
+          {(shown.length === 0 && !loading) ? (
+            <div className="text-muted-foreground">No videos to show. Try searching or switch to curated list.</div>
+          ) : (
+            shown.map((v) => (
+              <Card key={v.id} className="p-0 overflow-hidden">
+                <div className="aspect-video w-full bg-black">
+                  <iframe
+                    className="w-full h-full"
+                    src={`https://www.youtube.com/embed/${v.id}`}
+                    title={v.title}
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
                 </div>
-                <p className="mb-3 text-sm text-muted-foreground">{v.description}</p>
-                <div className="flex justify-end">
-                  <Button asChild variant="ghost" size="sm">
-                    <a href={`https://youtube.com/watch?v=${v.id}`} target="_blank" rel="noreferrer">
-                      Open on YouTube <ExternalLink className="inline-block ml-2 h-4 w-4" />
-                    </a>
-                  </Button>
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="mb-1 text-lg font-semibold">{v.title}</h3>
+                    <span className="text-xs rounded-full bg-muted/10 px-2 py-1">{v.category ?? 'General'}</span>
+                  </div>
+                  <p className="mb-3 text-sm text-muted-foreground">{v.description}</p>
+                  <div className="flex justify-between items-center">
+                    <Button asChild variant="ghost" size="sm">
+                      <a href={`https://youtube.com/watch?v=${v.id}`} target="_blank" rel="noreferrer">
+                        Open on YouTube <ExternalLink className="inline-block ml-2 h-4 w-4" />
+                      </a>
+                    </Button>
+                    {v.thumbnail && <img src={v.thumbnail} alt="thumb" className="w-20 h-12 object-cover rounded" />}
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))
+          )}
+        </div>
+
+        <div className="mt-6 flex items-center justify-center gap-4">
+          <Button onClick={onPrev} disabled={!prevPageToken || loading}>Previous</Button>
+          <div className="text-sm text-muted-foreground">{loading ? 'Loading...' : 'Page'}</div>
+          <Button onClick={onNext} disabled={!pageToken || loading}>Next</Button>
         </div>
       </main>
     </div>
