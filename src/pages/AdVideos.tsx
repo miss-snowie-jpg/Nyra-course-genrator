@@ -20,61 +20,47 @@ const curated: Video[] = [
   { id: "kXYiU_JCYtU", title: "Bold Headline Ad", description: "Bold, energetic promo", category: "General" },
 ];
 
-const getApiKey = () => import.meta.env.VITE_YOUTUBE_API_KEY || localStorage.getItem("youtube_api_key") || "";
-
 const AdVideos = () => {
-  const [useDynamic, setUseDynamic] = useState<boolean>(true);
-  const [query, setQuery] = useState<string>("course promo lifestyle");
-  const [results, setResults] = useState<Video[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [apiKeyInput, setApiKeyInput] = useState<string>(localStorage.getItem("youtube_api_key") || "");
-  const [pageToken, setPageToken] = useState<string | null>(null);
-  const [prevPageToken, setPrevPageToken] = useState<string | null>(null);
+    const [useDynamic, setUseDynamic] = useState<boolean>(true);
+    const [query, setQuery] = useState<string>("course promo lifestyle");
+    const [results, setResults] = useState<Video[]>([]);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
+    const [pageToken, setPageToken] = useState<string | null>(null);
+    const [prevPageToken, setPrevPageToken] = useState<string | null>(null);
 
-  const categories = useMemo(() => ["All", "Lifestyle", "General", "Explainer"], []);
-  const [activeCategory, setActiveCategory] = useState<string>("All");
+    const categories = useMemo(() => ["All", "Lifestyle", "General", "Explainer"], []);
+    const [activeCategory, setActiveCategory] = useState<string>("All");
 
-  const fetchVideos = async (opts?: { q?: string; token?: string }) => {
-    const key = getApiKey();
-    if (!key) {
-      setError("YouTube API key not set. Add it via VITE_YOUTUBE_API_KEY or enter it below.");
-      setResults([]);
-      return;
-    }
+    const fetchVideos = async (opts?: { q?: string; token?: string }) => {
+      setLoading(true);
+      setError(null);
 
-    setLoading(true);
-    setError(null);
+      try {
+        // Call server-side Supabase function to keep API key secret
+        const body = { q: opts?.q ?? query, pageToken: opts?.token ?? null };
+        const { data, error: fnError } = await (supabase as any).functions.invoke('youtube-search', { body });
+        if (fnError) throw fnError;
 
-    try {
-      const params = new URLSearchParams({
-        key,
-        part: "snippet",
-        q: opts?.q ?? query,
-        maxResults: "12",
-        type: "video",
-      });
-      if (opts?.token) params.set("pageToken", opts.token);
+        if (data?.error) throw new Error(data.error);
 
-      const url = `https://www.googleapis.com/youtube/v3/search?${params.toString()}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`YouTube API error: ${res.status}`);
-      const data = await res.json();
+        const vids: Video[] = (data.items || []).map((it: any) => ({
+          id: it.id,
+          title: it.title,
+          description: it.description,
+          thumbnail: it.thumbnail,
+          category: it.category,
+        }));
 
-      const vids: Video[] = (data.items || []).map((it: any) => ({
-        id: it.id.videoId,
-        title: it.snippet.title,
-        description: it.snippet.description,
-        thumbnail: it.snippet.thumbnails?.medium?.url ?? it.snippet.thumbnails?.default?.url,
-        category: it.snippet.title.toLowerCase().includes("lifestyle") || it.snippet.description.toLowerCase().includes("lifestyle") ? "Lifestyle" : "General",
-      }));
-
-      setResults(vids);
-      setPrevPageToken(data.prevPageToken ?? null);
-      setPageToken(data.nextPageToken ?? null);
-    } catch (err: any) {
-      setError(err?.message ?? "Failed to fetch videos");
-      setResults([]);
+        setResults(vids);
+        setPrevPageToken(data.prevPageToken ?? null);
+        setPageToken(data.nextPageToken ?? null);
+      } catch (err: any) {
+        setError(err?.message ?? "Failed to fetch videos");
+        // Fallback to curated list when server fails
+        setResults(curated);
+        setPrevPageToken(null);
+        setPageToken(null);
     } finally {
       setLoading(false);
     }
@@ -139,15 +125,9 @@ const AdVideos = () => {
           </div>
         </div>
 
-        {!getApiKey() && (
-          <div className="mb-6 rounded-md border border-border p-4">
-            <p className="text-sm mb-2">No YouTube API key found. You can set <code>VITE_YOUTUBE_API_KEY</code> in your environment or enter a key below (stored locally).</p>
-            <div className="flex gap-2">
-              <Input value={apiKeyInput} onChange={(e) => setApiKeyInput((e.target as HTMLInputElement).value)} placeholder="Enter YouTube API key" />
-              <Button onClick={saveApiKey}>Save key locally</Button>
-            </div>
-          </div>
-        )}
+        <div className="mb-6 rounded-md border border-border p-4">
+          <p className="text-sm mb-0">The YouTube API key must be set as a server secret named <code>YOUTUBE_API_KEY</code> for the deployed site (Supabase function reads it from the environment). If you want me to set it as a Supabase secret now, tell me and I will add instructions or apply it for you.</p>
+        </div>
 
         {error && <div className="mb-4 text-sm text-red-500">{error}</div>}
 
