@@ -1,17 +1,31 @@
+// The Supabase Edge runtime provides Deno and `serve` from the std library at runtime.
+// For local TypeScript checking, silence module resolution and declare a minimal Deno env.
+// @ts-expect-error: Deno std types are available in the Edge runtime
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
+// Use `globalThis.Deno` at runtime; avoid declaring Deno to prevent duplicate identifier issues in the workspace TS config.
+
+
+
+// Allow configuration of the origin via a secret `ALLOWED_ORIGIN` (set to a specific origin to restrict CORS, or leave empty for '*')
+const allowedOrigin = (globalThis as unknown as { Deno?: { env?: { get(name: string): string | undefined } } }).Deno?.env?.get('ALLOWED_ORIGIN') || '*'
+
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": allowedOrigin,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Max-Age": "600",
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    // Respond to preflight with 204 No Content and proper CORS headers
+    return new Response(null, { headers: corsHeaders, status: 204 })
   }
 
   try {
-    const YOUTUBE_API_KEY = Deno.env.get('YOUTUBE_API_KEY')
+    const deno = (globalThis as unknown as { Deno?: { env?: { get(name: string): string | undefined } } }).Deno
+    const YOUTUBE_API_KEY = deno?.env?.get('YOUTUBE_API_KEY')
     if (!YOUTUBE_API_KEY) {
       return new Response(JSON.stringify({ error: 'YOUTUBE_API_KEY is not set on the server' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -20,7 +34,7 @@ serve(async (req) => {
     }
 
     const isGet = req.method === 'GET'
-    let params: Record<string, string | undefined> = {}
+    const params: Record<string, string | undefined> = {}
 
     if (isGet) {
       const url = new URL(req.url)
@@ -55,15 +69,18 @@ serve(async (req) => {
       })
     }
 
-    const data = await ytRes.json()
+    type YTItem = { id: { videoId: string } | string; snippet: { title: string; description: string; thumbnails?: { medium?: { url: string }; default?: { url: string } } } }
+    type YTResponse = { items?: YTItem[]; nextPageToken?: string; prevPageToken?: string }
+    const data = await ytRes.json() as YTResponse
 
-    const items = (data.items || []).map((it: any) => ({
-      id: it.id.videoId,
-      title: it.snippet.title,
-      description: it.snippet.description,
-      thumbnail: it.snippet.thumbnails?.medium?.url ?? it.snippet.thumbnails?.default?.url,
-      category: it.snippet.title.toLowerCase().includes('lifestyle') || it.snippet.description.toLowerCase().includes('lifestyle') ? 'Lifestyle' : 'General',
-    }))
+    const items = ((data.items ?? []) as YTItem[]).map((it) => {
+      const id = typeof it.id === 'string' ? it.id : it.id.videoId
+      const title = it.snippet?.title ?? ''
+      const description = it.snippet?.description ?? ''
+      const thumbnail = it.snippet?.thumbnails?.medium?.url ?? it.snippet?.thumbnails?.default?.url
+      const cat = ((title || description) as string).toLowerCase().includes('lifestyle') ? 'Lifestyle' : 'General'
+      return { id, title, description, thumbnail, category: cat }
+    })
 
     return new Response(JSON.stringify({ items, nextPageToken: data.nextPageToken ?? null, prevPageToken: data.prevPageToken ?? null }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
