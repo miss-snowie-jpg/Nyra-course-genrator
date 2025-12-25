@@ -77,3 +77,20 @@ model AdJob {
 
   @@index([adId])
 }
+
+model AdUpload {
+  id          String   @id @default(uuid())
+  userId      String?
+  storagePath String
+  filename    String?
+  size        Int?
+  durationSec Int?
+  processed   Boolean  @default(false)
+  error       String?
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([processed])
+}

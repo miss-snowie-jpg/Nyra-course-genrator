@@ -4,6 +4,7 @@ import Filters from '../components/AdLibrary/Filters'
 import VideoPlayer from '../components/AdLibrary/VideoPlayer'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { supabase } from '@/integrations/supabase/client'
 
 type AdSummary = {
   id: string
@@ -95,6 +96,12 @@ export default function AdLibraryPage() {
             {addResult && <div className="mt-2 text-sm">{addResult}</div>}
             <div className="mt-2 text-xs text-muted-foreground">By submitting you confirm you have ownership or permission to use this video. Ads are auto-published.</div>
           </div>
+
+          <div className="mt-4 p-3 bg-white rounded shadow">
+            <h4 className="text-sm font-semibold mb-2">Upload short video (≤10s)</h4>
+            <UploadShortVideo />
+            <div className="mt-2 text-xs text-muted-foreground">Files are uploaded to the project's storage bucket `ads`. Ensure the bucket exists. Uploads auto-publish as user uploads.</div>
+          </div>
         </div>
         <div className="flex-1">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -112,3 +119,85 @@ export default function AdLibraryPage() {
     </div>
   )
 }
+
+
+// --- UploadShortVideo component (kept short) ---
+function UploadShortVideo() {
+  const [file, setFile] = React.useState<File | null>(null)
+  const [title, setTitle] = React.useState('')
+  const [loading, setLoading] = React.useState(false)
+  const [msg, setMsg] = React.useState<string | null>(null)
+
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] || null
+    setMsg(null)
+    if (!f) return setFile(null)
+
+    // quick duration check using a video element
+    const url = URL.createObjectURL(f)
+    const v = document.createElement('video')
+    v.preload = 'metadata'
+    v.src = url
+    await new Promise<void>((resolve) => {
+      v.onloadedmetadata = () => {
+        URL.revokeObjectURL(url)
+        resolve()
+      }
+      v.onerror = () => {
+        URL.revokeObjectURL(url)
+        resolve()
+      }
+    })
+    const dur = v.duration || 0
+    if (!dur || dur > 10) {
+      setMsg('Video must be 10s or shorter')
+      return setFile(null)
+    }
+    setFile(f)
+  }
+
+  async function handleUpload() {
+    if (!file) return
+    setLoading(true)
+    setMsg(null)
+    try {
+      const sess = await supabase.auth.getSession()
+      if (!sess || !sess.data.session) throw new Error('Sign in to upload')
+
+      const ts = Date.now()
+      const path = `uploads/${ts}-${file.name.replace(/[^a-z0-9_.-]/gi, '_')}`
+      const bucket = 'ads-raw'
+
+      const up = await supabase.storage.from(bucket).upload(path, file)
+      if (up.error) throw up.error
+
+      // Enqueue an AdUpload row (worker will process)
+      const userId = sess?.data?.session?.user?.id || null
+      const { data: inserted, error: insertErr } = await (supabase as any).from('AdUpload').insert([{ storagePath: path, filename: file.name, size: file.size, userId }])
+      if (insertErr) throw insertErr
+
+      setMsg('Uploaded. Processing will start shortly')
+      setFile(null)
+      setTitle('')
+      // Optionally refresh list after a delay
+      setTimeout(() => window.location.reload(), 1400)
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <input type="file" accept="video/*" onChange={onFileChange} />
+      <input className="mt-2 w-full" placeholder="Title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <div className="mt-2 flex gap-2">
+        <Button onClick={handleUpload} disabled={!file || loading}>{loading ? 'Uploading...' : 'Upload'}</Button>
+        <Button variant="ghost" onClick={() => { setFile(null); setTitle(''); setMsg(null) }}>Clear</Button>
+      </div>
+      {msg && <div className="mt-2 text-sm text-red-500">{msg}</div>}
+    </div>
+  )
+}
+
