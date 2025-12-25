@@ -1,0 +1,49 @@
+// Prisma schema for Ad Library
+// Designed for PostgreSQL. Run `npx prisma migrate dev` to apply.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Ad {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  platform    Platform
+  industry    String?    // free-form industry name
+  hookType    String?    // e.g., "Question", "Shock", "Demo"
+  ctaType     String?    // e.g., "Learn More", "Buy Now"
+  sourceUrl   String     // original video URL
+  thumbnail   String?    // cached thumbnail URL
+  durationSec Int?
+  tags        Tag[]      @relation("AdTags", references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Tag {
+  id    String @id @default(uuid())
+  name  String @unique
+  ads   Ad[]   @relation("AdTags")
+}
+
+model UserSavedAds {
+  id     String @id @default(uuid())
+  userId String // references existing auth/user table in Nyra
+  adId   String
+  savedAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([adId])
+}
+
+enum Platform {
+  TIKTOK
+  META
+  YOUTUBE
+}
