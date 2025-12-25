@@ -44,7 +44,7 @@ We added a Supabase Edge Function `add-ad` that accepts POST requests with `{ ur
 
 Notes about Supabase functions
 -----------------------------
-This repo contains Supabase Edge Functions that proxy YouTube queries (see `supabase/functions/youtube-search`). The Ad Library frontend will attempt to call a deployed function at `/supabase/functions/v1/youtube-search` and falls back to the client-side YouTube Data API if a function isn't available.
+This repo contains a Supabase Edge Function `video-search` that queries the internal Ad Library (if you implement it, see `supabase/functions/video-search`). The Ad Library frontend will attempt to call a deployed function at `/supabase/functions/v1/video-search`.
 
 Security & production TODOs
 --------------------------

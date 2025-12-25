@@ -18,29 +18,23 @@ export default function AdLibraryPage() {
   const [filters, setFilters] = React.useState({} as any)
   const [selected, setSelected] = React.useState<string | null>(null)
   const [previewSrc, setPreviewSrc] = React.useState<string | null>(null)
+  const [previewTitle, setPreviewTitle] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    fetchAds()
+  }, [filters])
+
 
   React.useEffect(() => {
     fetchAds()
   }, [filters])
 
   async function fetchAds() {
-    // Try serverless function first, fallback to client-side YouTube API call using VITE_YOUTUBE_API_KEY
     const q = new URLSearchParams(filters)
-    let res = await fetch(`/supabase/functions/v1/youtube-search?${q.toString()}`).catch(() => null)
+    const res = await fetch(`/supabase/functions/v1/video-search?${q.toString()}`).catch(() => null)
     if (!res || !res.ok) {
-      const key = import.meta.env.VITE_YOUTUBE_API_KEY
-      if (!key) return
-      const apiUrl = new URL('https://www.googleapis.com/youtube/v3/search')
-      apiUrl.searchParams.set('key', key)
-      apiUrl.searchParams.set('part', 'snippet')
-      apiUrl.searchParams.set('q', (filters.industry || 'ad') as string)
-      apiUrl.searchParams.set('maxResults', '24')
-      apiUrl.searchParams.set('type', 'video')
-      res = await fetch(apiUrl.toString())
-      if (!res.ok) return
-      const data = await res.json()
-      const items = (data.items || []).map((it: any) => ({ id: it.id.videoId, title: it.snippet.title, thumbnail: it.snippet.thumbnails?.medium?.url || it.snippet.thumbnails?.default?.url, platform: 'YOUTUBE', durationSec: undefined }))
-      setAds(items)
+      // If no function deployed, fallback to empty list (we rely on internal Ad Library)
+      setAds([])
       return
     }
     const data = await res.json()
@@ -49,10 +43,13 @@ export default function AdLibraryPage() {
 
   async function openAd(id: string) {
     setSelected(id)
-    const res = await fetch(`/api/ad-library/${id}`)
+    // Prefer the Edge function to fetch ad metadata
+    const res = await fetch(`/supabase/functions/v1/get-ad?id=${encodeURIComponent(id)}`)
     if (res.ok) {
       const data = await res.json()
-      setPreviewSrc(data.sourceUrl)
+      const ad = data.ad
+      setPreviewSrc(ad?.sourceUrl || ad?.source_url || null)
+      setPreviewTitle(ad?.title || null)
     }
   }
 
@@ -107,7 +104,7 @@ export default function AdLibraryPage() {
           </div>
         </div>
         <div className="w-96">
-          {previewSrc ? <VideoPlayer src={previewSrc} /> : <div className="p-4 bg-white rounded shadow">Select an ad to preview</div>}
+          {previewSrc ? <VideoPlayer src={previewSrc} filename={previewTitle ?? undefined} /> : <div className="p-4 bg-white rounded shadow">Select an ad to preview</div>}
         </div>
       </div>
 

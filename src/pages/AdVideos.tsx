@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import VideoPlayer from "@/components/AdLibrary/VideoPlayer";
 
 type Video = {
   id: string;
@@ -11,14 +11,16 @@ type Video = {
   description: string;
   thumbnail?: string;
   category?: string;
+  sourceUrl?: string | null;
+  durationSec?: number | null;
 };
 
 // Curated fallback list (kept small as a fallback)
 const curated: Video[] = [
-  { id: "9bZkp7q19f0", title: "Rich Lifestyle Montage", description: "Fast-paced lifestyle montage with premium visuals", category: "Lifestyle" },
-  { id: "RgKAFK5djSk", title: "Stylish Lifestyle Ad", description: "A lifestyle-focused ad with premium vibes", category: "Lifestyle" },
-  { id: "60ItHLz5WEA", title: "Aspirational Travel Ad", description: "Adventure and high-end travel visuals", category: "Lifestyle" },
-  { id: "kXYiU_JCYtU", title: "Bold Headline Ad", description: "Bold, energetic promo", category: "General" },
+  { id: "sample-1", title: "Rich Lifestyle Montage", description: "Fast-paced lifestyle montage with premium visuals", category: "Lifestyle" },
+  { id: "sample-2", title: "Stylish Lifestyle Ad", description: "A lifestyle-focused ad with premium vibes", category: "Lifestyle" },
+  { id: "sample-3", title: "Aspirational Travel Ad", description: "Adventure and high-end travel visuals", category: "Lifestyle" },
+  { id: "sample-4", title: "Bold Headline Ad", description: "Bold, energetic promo", category: "General" },
 ];
 
 const AdVideos = () => {
@@ -29,41 +31,39 @@ const AdVideos = () => {
     const [error, setError] = useState<string | null>(null);
     const [pageToken, setPageToken] = useState<string | null>(null);
     const [prevPageToken, setPrevPageToken] = useState<string | null>(null);
+    const [selected, setSelected] = useState<Video | null>(null);
 
   // Optional local API key for testing in environments without a server-side secret
-  const [apiKeyInput, setApiKeyInput] = useState<string>("");
-
-  useEffect(() => {
-    const saved = localStorage.getItem("youtube_api_key")
-    if (saved) setApiKeyInput(saved)
-  }, [])
+  // No YouTube API key required. The app searches the internal ad library and user-submitted ads.
     const [activeCategory, setActiveCategory] = useState<string>("All");
+    const [shortOnly, setShortOnly] = useState<boolean>(true);
 
     // Available categories for filtering
     const categories = useMemo(() => ["All", "Lifestyle", "General", "Explainer"], []);
 
-    type YouTubeSearchItem = { id: string; title: string; description?: string; thumbnail?: string; category?: string }
-    type YouTubeSearchResponse = { items?: YouTubeSearchItem[]; nextPageToken?: string | null; prevPageToken?: string | null; error?: string }
+    type VideoSearchItem = { id: string; title: string; description?: string; thumbnail?: string; category?: string; sourceUrl?: string }
+    type VideoSearchResponse = { items?: VideoSearchItem[]; nextPageToken?: string | null; prevPageToken?: string | null; error?: string }
 
     const fetchVideos = async (opts?: { q?: string; token?: string }) => {
       setLoading(true);
       setError(null);
 
       try {
-        // Call server-side Supabase function to keep API key secret
+        // Call server-side Edge Function `video-search` to query the internal Ad Library
         const body = { q: opts?.q ?? query, pageToken: opts?.token ?? null };
-        const { data, error: fnError } = await supabase.functions.invoke<YouTubeSearchResponse>('youtube-search', { body });
+        const { data, error: fnError } = await supabase.functions.invoke<VideoSearchResponse>('video-search', { body });
         if (fnError) throw fnError;
 
         if (data && data.error) throw new Error(data.error);
 
-        const items = (data?.items ?? []) as YouTubeSearchItem[];
+        const items = (data?.items ?? []) as VideoSearchItem[];
         const vids: Video[] = items.map((it) => ({
           id: it.id,
           title: it.title,
           description: it.description ?? '',
           thumbnail: it.thumbnail,
           category: it.category,
+          sourceUrl: it.sourceUrl ?? null,
         }));
 
         setResults(vids);
@@ -71,39 +71,7 @@ const AdVideos = () => {
         setPageToken(data?.nextPageToken ?? null);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        setError(msg || "Failed to fetch videos");
-
-        // Try client-side YouTube API using a local key (useful for local testing)
-        const localKey = apiKeyInput || localStorage.getItem('youtube_api_key')
-        if (localKey) {
-          try {
-            type YTSearchItem = { id: { videoId: string }; snippet: { title: string; description: string; thumbnails?: { medium?: { url: string }; default?: { url: string } } } }
-            const apiUrl = new URL('https://www.googleapis.com/youtube/v3/search')
-            apiUrl.searchParams.set('key', localKey)
-            apiUrl.searchParams.set('part', 'snippet')
-            apiUrl.searchParams.set('q', opts?.q ?? query)
-            apiUrl.searchParams.set('maxResults', '12')
-            apiUrl.searchParams.set('type', 'video')
-
-            const ytRes = await fetch(apiUrl.toString())
-            if (ytRes.ok) {
-              const data = await ytRes.json()
-              const vids: Video[] = (data.items || []).map((it: YTSearchItem) => ({
-                id: it.id.videoId,
-                title: it.snippet.title,
-                description: it.snippet.description,
-                thumbnail: it.snippet.thumbnails?.medium?.url || it.snippet.thumbnails?.default?.url,
-                category: (it.snippet.title || it.snippet.description || '').toLowerCase().includes('lifestyle') ? 'Lifestyle' : 'General',
-              }))
-              setResults(vids)
-              setPrevPageToken(data.prevPageToken ?? null)
-              setPageToken(data.nextPageToken ?? null)
-              return
-            }
-          } catch (e) {
-            // ignore and fall through to curated
-          }
-        }
+        setError(msg || 'Failed to fetch videos');
 
         // Final fallback: curated list
         setResults(curated);
@@ -130,12 +98,7 @@ const AdVideos = () => {
     fetchVideos({ token: prevPageToken });
   };
 
-  const saveApiKey = () => {
-    localStorage.setItem("youtube_api_key", apiKeyInput.trim());
-    setError(null);
-  };
-
-  // Edge function tester state and helper
+// Edge function tester state and helper
   const [edgeUrl, setEdgeUrl] = useState<string>("")
   const [edgeResponse, setEdgeResponse] = useState<string>("")
   const [edgeLoading, setEdgeLoading] = useState<boolean>(false)
@@ -161,9 +124,11 @@ const AdVideos = () => {
 
   const shown = useMemo(() => {
     const base = useDynamic ? results : curated;
-    if (activeCategory === "All") return base;
-    return base.filter((v) => (v.category ?? "General") === activeCategory);
-  }, [useDynamic, results, activeCategory]);
+    let list = base;
+    if (activeCategory !== "All") list = list.filter((v) => (v.category ?? "General") === activeCategory);
+    if (shortOnly) list = list.filter((v) => (typeof v.durationSec === 'number' ? v.durationSec <= 10 : false));
+    return list;
+  }, [useDynamic, results, activeCategory, shortOnly]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -174,14 +139,14 @@ const AdVideos = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <p className="mb-4 text-muted-foreground">Search YouTube for course promo and lifestyle ads. Results are loaded 12 per page and support pagination.</p>
+        <p className="mb-4 text-muted-foreground">Search the Ad Library (curated + user-submitted ads). Results are loaded per page and support pagination.</p>
 
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <form onSubmit={onSearch} className="flex gap-2 w-full md:max-w-xl">
             <Input value={query} onChange={(e) => setQuery((e.target as HTMLInputElement).value)} placeholder="Search e.g. 'course promo lifestyle'" />
             <Button type="submit" className="whitespace-nowrap">Search</Button>
             <Button variant={useDynamic ? "ghost" : "secondary"} onClick={() => { setUseDynamic(!useDynamic); setResults([]); }}>
-              {useDynamic ? 'Using YouTube API' : 'Using curated list'}
+              {useDynamic ? 'Using library search' : 'Using curated list'}
             </Button>
           </form>
 
@@ -194,24 +159,21 @@ const AdVideos = () => {
                 </button>
               ))}
             </div>
+            <div className="ml-4 flex items-center gap-2">
+              <input id="shortOnly" type="checkbox" checked={shortOnly} onChange={(e) => setShortOnly(e.target.checked)} />
+              <label htmlFor="shortOnly" className="text-sm text-muted-foreground">Only ≤10s</label>
+            </div>
           </div>
         </div>
 
         <div className="mb-6 rounded-md border border-border p-4">
-          <p className="text-sm mb-2">The YouTube API key must be set as a server secret named <code>YOUTUBE_API_KEY</code> for the deployed site (Supabase function reads it from the environment). If you want me to set it as a Supabase secret now, tell me and I will add instructions or apply it for you.</p>
-
-          {/* Local testing helper: store a temporary API key in localStorage (not for production) */}
-          <div className="flex items-center gap-2 mt-2">
-            <Input placeholder="Local YouTube API key (optional)" value={apiKeyInput} onChange={(e) => setApiKeyInput((e.target as HTMLInputElement).value)} />
-            <Button onClick={saveApiKey}>Save</Button>
-            <Button variant="ghost" onClick={() => { localStorage.removeItem('youtube_api_key'); setApiKeyInput(''); }}>Clear</Button>
-          </div>
+          <p className="text-sm mb-0">Searches are performed against the internal Ad Library (curated + submitted). No external API keys are required.</p>
 
           {/* Edge function tester: send a direct request to a deployed function and see raw response */}
           <div className="mt-4 border-t pt-4">
             <label className="text-sm text-muted-foreground">Edge Function URL (optional)</label>
             <div className="flex gap-2 mt-2">
-              <Input placeholder="https://<project>.supabase.co/functions/v1/youtube-search" value={edgeUrl} onChange={(e) => setEdgeUrl((e.target as HTMLInputElement).value)} />
+              <Input placeholder="https://<project>.supabase.co/functions/v1/video-search" value={edgeUrl} onChange={(e) => setEdgeUrl((e.target as HTMLInputElement).value)} />
               <Button onClick={sendToEdge} disabled={!edgeUrl || edgeLoading}>
                 {edgeLoading ? 'Sending...' : 'Send to Edge Function'}
               </Button>
@@ -233,15 +195,15 @@ const AdVideos = () => {
           ) : (
             shown.map((v) => (
               <Card key={v.id} className="p-0 overflow-hidden">
-                <div className="aspect-video w-full bg-black">
-                  <iframe
-                    className="w-full h-full"
-                    src={`https://www.youtube.com/embed/${v.id}`}
-                    title={v.title}
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
+                <div className="aspect-video w-full bg-black relative">
+                  {v.thumbnail ? (
+                    <img src={v.thumbnail} alt={v.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">No preview available</div>
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <button className="pointer-events-auto rounded-full bg-white/90 p-3 shadow" onClick={() => setSelected(v)}>Play</button>
+                  </div>
                 </div>
                 <div className="p-4">
                   <div className="flex items-center justify-between">
@@ -250,11 +212,7 @@ const AdVideos = () => {
                   </div>
                   <p className="mb-3 text-sm text-muted-foreground">{v.description}</p>
                   <div className="flex justify-between items-center">
-                    <Button asChild variant="ghost" size="sm">
-                      <a href={`https://youtube.com/watch?v=${v.id}`} target="_blank" rel="noreferrer">
-                        Open on YouTube <ExternalLink className="inline-block ml-2 h-4 w-4" />
-                      </a>
-                    </Button>
+                    <Button size="sm" onClick={() => setSelected(v)}>Preview</Button>
                     {v.thumbnail && <img src={v.thumbnail} alt="thumb" className="w-20 h-12 object-cover rounded" />}
                   </div>
                 </div>
@@ -262,6 +220,21 @@ const AdVideos = () => {
             ))
           )}
         </div>
+
+        {selected && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60" onClick={() => setSelected(null)}>
+            <div className="bg-white p-4 max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-2 flex justify-end">
+                <Button variant="ghost" onClick={() => setSelected(null)}>Close</Button>
+              </div>
+              {selected.sourceUrl ? (
+                <VideoPlayer src={selected.sourceUrl} />
+              ) : (
+                <div className="p-6">No preview available for this ad.</div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 flex items-center justify-center gap-4">
           <Button onClick={onPrev} disabled={!prevPageToken || loading}>Previous</Button>

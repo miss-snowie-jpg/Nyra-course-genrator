@@ -44,7 +44,19 @@ export const AdCard: React.FC<Props> = ({ id, title, thumbnail, platform, durati
           <button onClick={toggleSave} disabled={saving} className="text-sm text-indigo-600">
             {saving ? 'Saving...' : 'Save'}
           </button>
-          <button onClick={() => onOpen(id)} className="text-sm text-gray-600">Preview</button>
+          <div className="flex gap-2">
+            <button onClick={() => onOpen(id)} className="text-sm text-gray-600">Preview</button>
+            <button onClick={async (e) => {
+              e.stopPropagation()
+              const session = await supabase.auth.getSession()
+              if (!session || !session.data.session) {
+                alert('Sign in to download')
+                return
+              }
+              // Short proxy download URL (streams file from the source; enforces duration server-side)
+              window.open(`/supabase/functions/v1/download-ad?id=${encodeURIComponent(id)}`, '_blank', 'noopener')
+            }} className="text-sm text-indigo-600">Download</button>
+          </div>
         </div>
       </div>
     </div>
