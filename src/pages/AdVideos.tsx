@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
 
 type Video = {
   id: string;
@@ -29,8 +30,20 @@ const AdVideos = () => {
     const [pageToken, setPageToken] = useState<string | null>(null);
     const [prevPageToken, setPrevPageToken] = useState<string | null>(null);
 
-    const categories = useMemo(() => ["All", "Lifestyle", "General", "Explainer"], []);
+  // Optional local API key for testing in environments without a server-side secret
+  const [apiKeyInput, setApiKeyInput] = useState<string>("");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("youtube_api_key")
+    if (saved) setApiKeyInput(saved)
+  }, [])
     const [activeCategory, setActiveCategory] = useState<string>("All");
+
+    // Available categories for filtering
+    const categories = useMemo(() => ["All", "Lifestyle", "General", "Explainer"], []);
+
+    type YouTubeSearchItem = { id: string; title: string; description?: string; thumbnail?: string; category?: string }
+    type YouTubeSearchResponse = { items?: YouTubeSearchItem[]; nextPageToken?: string | null; prevPageToken?: string | null; error?: string }
 
     const fetchVideos = async (opts?: { q?: string; token?: string }) => {
       setLoading(true);
@@ -39,31 +52,66 @@ const AdVideos = () => {
       try {
         // Call server-side Supabase function to keep API key secret
         const body = { q: opts?.q ?? query, pageToken: opts?.token ?? null };
-        const { data, error: fnError } = await (supabase as any).functions.invoke('youtube-search', { body });
+        const { data, error: fnError } = await supabase.functions.invoke<YouTubeSearchResponse>('youtube-search', { body });
         if (fnError) throw fnError;
 
-        if (data?.error) throw new Error(data.error);
+        if (data && data.error) throw new Error(data.error);
 
-        const vids: Video[] = (data.items || []).map((it: any) => ({
+        const items = (data?.items ?? []) as YouTubeSearchItem[];
+        const vids: Video[] = items.map((it) => ({
           id: it.id,
           title: it.title,
-          description: it.description,
+          description: it.description ?? '',
           thumbnail: it.thumbnail,
           category: it.category,
         }));
 
         setResults(vids);
-        setPrevPageToken(data.prevPageToken ?? null);
-        setPageToken(data.nextPageToken ?? null);
-      } catch (err: any) {
-        setError(err?.message ?? "Failed to fetch videos");
-        // Fallback to curated list when server fails
+        setPrevPageToken(data?.prevPageToken ?? null);
+        setPageToken(data?.nextPageToken ?? null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(msg || "Failed to fetch videos");
+
+        // Try client-side YouTube API using a local key (useful for local testing)
+        const localKey = apiKeyInput || localStorage.getItem('youtube_api_key')
+        if (localKey) {
+          try {
+            type YTSearchItem = { id: { videoId: string }; snippet: { title: string; description: string; thumbnails?: { medium?: { url: string }; default?: { url: string } } } }
+            const apiUrl = new URL('https://www.googleapis.com/youtube/v3/search')
+            apiUrl.searchParams.set('key', localKey)
+            apiUrl.searchParams.set('part', 'snippet')
+            apiUrl.searchParams.set('q', opts?.q ?? query)
+            apiUrl.searchParams.set('maxResults', '12')
+            apiUrl.searchParams.set('type', 'video')
+
+            const ytRes = await fetch(apiUrl.toString())
+            if (ytRes.ok) {
+              const data = await ytRes.json()
+              const vids: Video[] = (data.items || []).map((it: YTSearchItem) => ({
+                id: it.id.videoId,
+                title: it.snippet.title,
+                description: it.snippet.description,
+                thumbnail: it.snippet.thumbnails?.medium?.url || it.snippet.thumbnails?.default?.url,
+                category: (it.snippet.title || it.snippet.description || '').toLowerCase().includes('lifestyle') ? 'Lifestyle' : 'General',
+              }))
+              setResults(vids)
+              setPrevPageToken(data.prevPageToken ?? null)
+              setPageToken(data.nextPageToken ?? null)
+              return
+            }
+          } catch (e) {
+            // ignore and fall through to curated
+          }
+        }
+
+        // Final fallback: curated list
         setResults(curated);
         setPrevPageToken(null);
         setPageToken(null);
-    } finally {
-      setLoading(false);
-    }
+      } finally {
+        setLoading(false);
+      }
   };
 
   const onSearch = (e?: React.FormEvent) => {
@@ -88,7 +136,7 @@ const AdVideos = () => {
   };
 
   const shown = useMemo(() => {
-    let base = useDynamic ? results : curated;
+    const base = useDynamic ? results : curated;
     if (activeCategory === "All") return base;
     return base.filter((v) => (v.category ?? "General") === activeCategory);
   }, [useDynamic, results, activeCategory]);
@@ -126,7 +174,14 @@ const AdVideos = () => {
         </div>
 
         <div className="mb-6 rounded-md border border-border p-4">
-          <p className="text-sm mb-0">The YouTube API key must be set as a server secret named <code>YOUTUBE_API_KEY</code> for the deployed site (Supabase function reads it from the environment). If you want me to set it as a Supabase secret now, tell me and I will add instructions or apply it for you.</p>
+          <p className="text-sm mb-2">The YouTube API key must be set as a server secret named <code>YOUTUBE_API_KEY</code> for the deployed site (Supabase function reads it from the environment). If you want me to set it as a Supabase secret now, tell me and I will add instructions or apply it for you.</p>
+
+          {/* Local testing helper: store a temporary API key in localStorage (not for production) */}
+          <div className="flex items-center gap-2 mt-2">
+            <Input placeholder="Local YouTube API key (optional)" value={apiKeyInput} onChange={(e) => setApiKeyInput((e.target as HTMLInputElement).value)} />
+            <Button onClick={saveApiKey}>Save</Button>
+            <Button variant="ghost" onClick={() => { localStorage.removeItem('youtube_api_key'); setApiKeyInput(''); }}>Clear</Button>
+          </div>
         </div>
 
         {error && <div className="mb-4 text-sm text-red-500">{error}</div>}

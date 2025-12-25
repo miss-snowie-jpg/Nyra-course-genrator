@@ -7,7 +7,10 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // The connection `url` is intentionally omitted here. Configure `DATABASE_URL`
+  // in your deployment environment or a root `.env` file so secrets are not
+  // committed into source control. Prisma will pick up `DATABASE_URL` from
+  // the environment at runtime.
 }
 
 model Ad {
