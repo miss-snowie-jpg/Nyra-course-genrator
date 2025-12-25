@@ -38,6 +38,10 @@ npx prisma migrate dev --name add_ad_library
 node -e "require('./src/server/fetchAdVideos').fetchAdVideos()"
 ```
 
+New: Add-by-URL flow
+--------------------
+We added a Supabase Edge Function `add-ad` that accepts POST requests with `{ url }` to ingest user-provided video URLs. It attempts to extract metadata (oEmbed or YouTube Data API) and saves to the `user_added_ads` table (SQL included in `supabase/functions/add-ad/README.md`). This flow auto-publishes ads and is intended for quick inclusion of user-supplied links.
+
 Notes about Supabase functions
 -----------------------------
 This repo contains Supabase Edge Functions that proxy YouTube queries (see `supabase/functions/youtube-search`). The Ad Library frontend will attempt to call a deployed function at `/supabase/functions/v1/youtube-search` and falls back to the client-side YouTube Data API if a function isn't available.

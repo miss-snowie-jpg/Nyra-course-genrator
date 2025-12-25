@@ -14,19 +14,22 @@ datasource db {
 }
 
 model Ad {
-  id          String    @id @default(uuid())
-  title       String
-  description String?
-  platform    Platform
-  industry    String?    // free-form industry name
-  hookType    String?    // e.g., "Question", "Shock", "Demo"
-  ctaType     String?    // e.g., "Learn More", "Buy Now"
-  sourceUrl   String     // original video URL
-  thumbnail   String?    // cached thumbnail URL
-  durationSec Int?
-  tags        Tag[]      @relation("AdTags", references: [id])
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id           String     @id @default(uuid())
+  title        String
+  description  String?
+  platform     Platform
+  industry     String?    // free-form industry name
+  hookType     String?    // e.g., "Question", "Shock", "Demo"
+  ctaType      String?    // e.g., "Learn More", "Buy Now"
+  sourceUrl    String     // original video URL
+  sourceType   SourceType @default(AUTO) // AUTO | USER_URL | USER_UPLOAD
+  originalOwner String?
+  published    Boolean    @default(true)
+  thumbnail    String?    // cached thumbnail URL
+  durationSec  Int?
+  tags         Tag[]      @relation("AdTags", references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 }
 
 model Tag {
@@ -49,4 +52,28 @@ enum Platform {
   TIKTOK
   META
   YOUTUBE
+}
+
+enum SourceType {
+  AUTO
+  USER_URL
+  USER_UPLOAD
+}
+
+enum JobType {
+  REPOST
+  REFRESH
+}
+
+model AdJob {
+  id         String   @id @default(uuid())
+  adId       String
+  type       JobType
+  intervalMin Int     @default(1440) // minutes between runs; default: daily
+  active     Boolean  @default(true)
+  lastRunAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([adId])
 }

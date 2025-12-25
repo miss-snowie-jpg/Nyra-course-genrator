@@ -135,6 +135,30 @@ const AdVideos = () => {
     setError(null);
   };
 
+  // Edge function tester state and helper
+  const [edgeUrl, setEdgeUrl] = useState<string>("")
+  const [edgeResponse, setEdgeResponse] = useState<string>("")
+  const [edgeLoading, setEdgeLoading] = useState<boolean>(false)
+
+  async function sendToEdge() {
+    if (!edgeUrl) return
+    setEdgeLoading(true)
+    setEdgeResponse('')
+    try {
+      const res = await fetch(edgeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: query }),
+      })
+      const text = await res.text()
+      setEdgeResponse(`Status: ${res.status}\n\n${text}`)
+    } catch (err) {
+      setEdgeResponse(`Error: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setEdgeLoading(false)
+    }
+  }
+
   const shown = useMemo(() => {
     const base = useDynamic ? results : curated;
     if (activeCategory === "All") return base;
@@ -181,6 +205,23 @@ const AdVideos = () => {
             <Input placeholder="Local YouTube API key (optional)" value={apiKeyInput} onChange={(e) => setApiKeyInput((e.target as HTMLInputElement).value)} />
             <Button onClick={saveApiKey}>Save</Button>
             <Button variant="ghost" onClick={() => { localStorage.removeItem('youtube_api_key'); setApiKeyInput(''); }}>Clear</Button>
+          </div>
+
+          {/* Edge function tester: send a direct request to a deployed function and see raw response */}
+          <div className="mt-4 border-t pt-4">
+            <label className="text-sm text-muted-foreground">Edge Function URL (optional)</label>
+            <div className="flex gap-2 mt-2">
+              <Input placeholder="https://<project>.supabase.co/functions/v1/youtube-search" value={edgeUrl} onChange={(e) => setEdgeUrl((e.target as HTMLInputElement).value)} />
+              <Button onClick={sendToEdge} disabled={!edgeUrl || edgeLoading}>
+                {edgeLoading ? 'Sending...' : 'Send to Edge Function'}
+              </Button>
+              <Button variant="ghost" onClick={() => { setEdgeUrl(''); setEdgeResponse(''); }}>
+                Clear
+              </Button>
+            </div>
+            {edgeResponse && (
+              <pre className="mt-3 max-h-48 overflow-auto bg-slate-900/5 p-3 text-xs rounded">{edgeResponse}</pre>
+            )}
           </div>
         </div>
 
