@@ -1,10 +1,11 @@
 Upload Processor Worker
 
 This worker processes uploads in the `AdUpload` table:
-- Downloads raw uploaded files from `ads-raw` bucket
+- Downloads raw uploaded files from the `ads-raw` bucket or fetches remote URLs (ingest)
 - Uses ffmpeg to transcode to MP4 (H.264) and create a thumbnail
 - Uploads processed video to `ads` and thumbnail to `ads-thumbs`
-- Inserts an `Ad` row and marks `AdUpload.processed = true`
+- Updates or inserts an `Ad` row and marks `AdUpload.processed = true`
+- When ingest creates an `AdUpload` with `remote=true` and `adId` set, the worker will fetch the remote asset and update the existing `Ad` record with the processed video and thumbnail
 
 Requirements
 - Node 18+

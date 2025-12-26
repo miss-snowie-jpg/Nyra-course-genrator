@@ -42,7 +42,9 @@ type AdUploadRow = {
   filename?: string
   size?: number
   userId?: string | null
+  adId?: string | null
   durationSec?: number | null
+  remote?: boolean
   processed?: boolean
 }
 
@@ -60,18 +62,27 @@ async function pollOnce() {
   for (const u of uploads) {    console.log('Processing upload', u.id, u.storagePath)
     try {
       const bucket = 'ads-raw'
-      // Create signed url to download
-      const { data: signed, error: sErr } = await supabase.storage.from(bucket).createSignedUrl(u.storagePath, 60)
-      if (sErr || !signed) throw sErr || new Error('Failed to create signed URL')
-      const url = signed.signedUrl
-
-      // Download to tmp file
+      // Prepare tmp dir and rawPath
       const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ad-upload-'))
-      const rawPath = path.join(tmpDir, path.basename(u.storagePath))
-      const res = await fetch(url)
-      if (!res.ok) throw new Error('Failed to download raw file')
-      const buffer = Buffer.from(await res.arrayBuffer())
-      fs.writeFileSync(rawPath, buffer)
+      const rawName = u.remote ? path.basename(u.storagePath.split('?')[0]) : path.basename(u.storagePath)
+      const rawPath = path.join(tmpDir, rawName)
+
+      // If remote URL, fetch directly; else create signed URL from storage and fetch
+      if (u.remote) {
+        const res = await fetch(u.storagePath)
+        if (!res.ok) throw new Error(`Failed to download remote URL ${res.status}`)
+        const buffer = Buffer.from(await res.arrayBuffer())
+        fs.writeFileSync(rawPath, buffer)
+      } else {
+        const bucket = 'ads-raw'
+        const { data: signed, error: sErr } = await supabase.storage.from(bucket).createSignedUrl(u.storagePath, 60)
+        if (sErr || !signed) throw sErr || new Error('Failed to create signed URL')
+        const url = signed.signedUrl
+        const res = await fetch(url)
+        if (!res.ok) throw new Error('Failed to download raw file')
+        const buffer = Buffer.from(await res.arrayBuffer())
+        fs.writeFileSync(rawPath, buffer)
+      }
 
       // get duration using ffprobe via fluent-ffmpeg
       const duration = await new Promise<number>((resolve, reject) => {
@@ -130,29 +141,38 @@ async function pollOnce() {
 
       if (!videoUrl) throw new Error('Failed to obtain processed public URL')
 
-      // Create Ad record
-      const adRow = {
-        title: u.filename || `Uploaded ad ${Date.now()}`,
-        description: '',
-        platform: 'USER_UPLOAD',
-        industry: null,
-        hookType: null,
-        ctaType: null,
-        sourceUrl: videoUrl,
-        sourceType: 'USER_UPLOAD',
-        originalOwner: u.userId || null,
-        published: true,
-        thumbnail: thumbUrl || null,
-        durationSec: duration,
-        createdAt: new Date().toISOString(),
-      }
+      // Update or create Ad record
+      if (u.adId) {
+        const updateRes = await supabase.from('Ad').update({ sourceUrl: videoUrl, thumbnail: thumbUrl || null, durationSec: duration }).eq('id', u.adId)
+        if (updateRes.error) throw updateRes.error
+      } else {
+        const adRow = {
+          title: u.filename || `Uploaded ad ${Date.now()}`,
+          description: '',
+          platform: 'USER_UPLOAD',
+          industry: null,
+          hookType: null,
+          ctaType: null,
+          sourceUrl: videoUrl,
+          sourceType: 'USER_UPLOAD',
+          originalOwner: u.userId || null,
+          published: true,
+          thumbnail: thumbUrl || null,
+          durationSec: duration,
+          createdAt: new Date().toISOString(),
+        }
 
-      const insertRes = await supabase.from('Ad').insert([adRow])
-      if (insertRes.error) throw insertRes.error
+        const insertRes = await supabase.from('Ad').insert([adRow])
+        if (insertRes.error) throw insertRes.error
+      }
 
       // mark upload processed
       await supabase.from('AdUpload').update({ processed: true, durationSec: duration, processedAt: new Date().toISOString() }).eq('id', u.id)
 
+      // If this was a remote AdUpload (came from ingest), set Ad.published true just in case
+      if (u.adId) {
+        await supabase.from('Ad').update({ published: true }).eq('id', u.adId)
+      }
       // cleanup
       fs.rmSync(tmpDir, { recursive: true, force: true })
       console.log('Processed upload', u.id)

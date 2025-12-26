@@ -81,10 +81,12 @@ model AdJob {
 model AdUpload {
   id          String   @id @default(uuid())
   userId      String?
+  adId        String?  // link to Ad if created by ingest
   storagePath String
   filename    String?
   size        Int?
   durationSec Int?
+  remote      Boolean  @default(false) // true if storagePath is a URL to fetch
   processed   Boolean  @default(false)
   error       String?
   processedAt DateTime?
@@ -93,4 +95,5 @@ model AdUpload {
 
   @@index([userId])
   @@index([processed])
+  @@index([adId])
 }

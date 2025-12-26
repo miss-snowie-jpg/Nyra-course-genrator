@@ -1,0 +1,10 @@
+{
+  "sources": [
+    // Add external feed URLs here. Examples:
+    // "https://example.com/ads-feed.json",
+    // "https://example.com/ads-rss.xml",
+
+    // You can add YouTube RSS channels if you want (optional)
+    // "https://www.youtube.com/feeds/videos.xml?channel_id=UC4R8DWoMoI7CAwX8_LjQHig"
+  ]
+}

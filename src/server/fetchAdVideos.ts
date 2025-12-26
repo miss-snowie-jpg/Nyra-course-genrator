@@ -50,58 +50,123 @@ async function fetchYouTubeChannelFeed(rssUrl: string): Promise<AdSource[]> {
 }
 
 // Normalize and upsert array of AdSource into DB
-export async function fetchAdVideos(): Promise<void> {
-  // Sources can be extended. Currently demonstrates a YouTube RSS channel fetch.
-  const sources = [
-    // Example: YouTube channel RSS (replace with curated ad channels or playlists)
-    'https://www.youtube.com/feeds/videos.xml?channel_id=UC4R8DWoMoI7CAwX8_LjQHig',
-  ]
+export async function fetchAdVideos(maxPerRun = 6): Promise<void> {
+  // Load sources from config file (repo-level JSON); fallback to YouTube RSS example
+  let sources: string[] = []
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const cfg = require('./ad-sources.json')
+    sources = cfg?.sources || []
+  } catch (e) {
+    sources = ['https://www.youtube.com/feeds/videos.xml?channel_id=UC4R8DWoMoI7CAwX8_LjQHig']
+  }
 
+  // Collect candidate items from all sources
+  const candidates: AdSource[] = []
   for (const src of sources) {
     try {
-      const items = await fetchYouTubeChannelFeed(src)
-      for (const item of items) {
-        // Upsert tags and ad record
-        const tagRecords = [] as { id: string }[]
-        if (item.tags?.length) {
-          for (const t of item.tags) {
-            const tag = await prisma.tag.upsert({
-              where: { name: t },
-              update: {},
-              create: { name: t },
-            })
-            tagRecords.push({ id: tag.id })
+      if (src.includes('youtube.com') || src.includes('youtu.be')) {
+        const items = await fetchYouTubeChannelFeed(src)
+        candidates.push(...items)
+      } else {
+        // Try generic RSS/JSON feed parser (basic)
+        try {
+          const res = await fetch(src)
+          if (!res.ok) continue
+          const text = await res.text()
+          // try simple JSON array
+          try {
+            const j = JSON.parse(text)
+            if (Array.isArray(j)) {
+              for (const it of j) {
+                if (it?.url) {
+                  candidates.push({
+                    id: it.id || it.url,
+                    title: it.title || it.name || 'Untitled',
+                    description: it.description || '',
+                    platform: Platform.META,
+                    sourceUrl: it.url,
+                    thumbnail: it.thumbnail || null,
+                    durationSec: it.duration || it.durationSec || null,
+                  })
+                }
+              }
+            }
+          } catch (_) {
+            // Basic RSS parsing: find <item> with enclosure url or link
+            const items = Array.from(text.matchAll(/<item>[\s\S]*?<link>(.*?)<\/link>[\s\S]*?<title>(.*?)<\/title>[\s\S]*?(?:<enclosure [^>]*url=\"(.*?)\"[^>]*>)?/g))
+            for (const m of items) {
+              const link = m[1]
+              const title = m[2]
+              const enclosure = m[3]
+              const url = enclosure || link
+              if (url) {
+                candidates.push({
+                  id: url,
+                  title: title || 'Untitled',
+                  description: '',
+                  platform: Platform.TIKTOK,
+                  sourceUrl: url,
+                })
+              }
+            }
           }
+        } catch (e) {
+          // ignore source errors
+          console.error('Failed to fetch generic source', src, e)
         }
-
-        // Upsert Ad by sourceUrl
-        await prisma.ad.upsert({
-          where: { sourceUrl: item.sourceUrl },
-          update: {
-            title: item.title,
-            description: item.description,
-            thumbnail: item.thumbnail,
-            durationSec: item.durationSec,
-            platform: item.platform,
-            industry: item.industry,
-          },
-          create: {
-            title: item.title,
-            description: item.description,
-            thumbnail: item.thumbnail,
-            durationSec: item.durationSec,
-            platform: item.platform,
-            industry: item.industry,
-            sourceUrl: item.sourceUrl,
-            tags: { connect: tagRecords },
-          },
-        })
       }
     } catch (err) {
-      // Log and continue; ingestion should be resilient
-      // In production, use structured logging and retry/backoff
-      // eslint-disable-next-line no-console
       console.error('Error fetching source', src, err)
+    }
+  }
+
+  // Deduplicate and prefer short videos (≤10s) where duration available
+  // Query existing sourceUrls
+  const sourceUrls = candidates.map((c) => c.sourceUrl)
+  const existing = await prisma.ad.findMany({ where: { sourceUrl: { in: sourceUrls } }, select: { sourceUrl: true } })
+  const existingSet = new Set(existing.map((e) => e.sourceUrl))
+
+  const newCandidates = candidates.filter((c) => !existingSet.has(c.sourceUrl))
+
+  // sort: prefer shorter duration and then any order
+  newCandidates.sort((a, b) => ( (a.durationSec || 999) - (b.durationSec || 999) ))
+
+  const toInsert = newCandidates.slice(0, maxPerRun)
+
+  for (const item of toInsert) {
+    try {
+      const tagRecords: { id: string }[] = []
+      if (item.tags?.length) {
+        for (const t of item.tags) {
+          const tag = await prisma.tag.upsert({ where: { name: t }, update: {}, create: { name: t } })
+          tagRecords.push({ id: tag.id })
+        }
+      }
+
+      try {
+        const created = await prisma.ad.create({
+          data: {
+            title: item.title,
+            description: item.description || null,
+            thumbnail: item.thumbnail || null,
+            durationSec: item.durationSec || null,
+            platform: item.platform,
+            sourceUrl: item.sourceUrl,
+            sourceType: 'AUTO',
+            published: true,
+            tags: { connect: tagRecords },
+          }
+        })
+        console.log('Inserted ad', item.title)
+
+        // Enqueue remote download for processing (worker will fetch, transcode, and update Ad)
+        await prisma.adUpload.create({ data: { adId: created.id, storagePath: item.sourceUrl, filename: item.title || null, remote: true } })
+      } catch (e) {
+        console.error('Failed to insert candidate', item, e)
+      }
+    } catch (e) {
+      console.error('Failed to insert candidate', item, e)
     }
   }
 

@@ -35,8 +35,15 @@ npx prisma migrate dev --name add_ad_library
 4. Run the ingestion service on a schedule (cron, GitHub Actions, or a serverless function). Example (local run):
 
 ```bash
-node -e "require('./src/server/fetchAdVideos').fetchAdVideos()"
+node -e "require('./src/server/runIngest').runIngest && node ./dist/server/runIngest.js"
 ```
+
+Daily ingest:
+- Configure feed URLs in `src/server/ad-sources.json`.
+- A GitHub Actions workflow `.github/workflows/ingest-daily.yml` runs `src/server/runIngest.ts` daily and inserts up to 6 new ads per run. Set `DATABASE_URL` in GitHub Secrets for the workflow to work.
+
+Daily uploads to YouTube:
+- A GitHub Actions workflow `.github/workflows/upload-daily.yml` runs `scripts/fetch_ads_for_upload.js` to download up to 6 short ads into `./videos`, then runs `upload.js` to upload them to YouTube. Add these repository secrets: `CLIENT_ID`, `CLIENT_SECRET`, `REFRESH_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Optionally set `DAILY_QUOTA` and `UPLOAD_COST` (defaults in `upload.js`).
 
 New: Add-by-URL flow
 --------------------
