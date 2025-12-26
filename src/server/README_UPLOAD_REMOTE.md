@@ -1,49 +1,26 @@
-API route: Upload remote video to YouTube and record in Prisma
+API route: Enqueue a remote video URL for download & processing
 
 File: `api/upload-remote-video.ts` (Next.js/Vercel style)
 
 Overview
 - POST /api/upload-remote-video
   - Headers: `x-auth-token: <AUTH_TOKEN>` (AUTH_TOKEN environment variable required)
-  - Body: { url: string, title?: string }
-  - Action: downloads remote URL, streams to YouTube via googleapis (YouTube v3), stores result in Prisma `Video` table
+  - Body: { url: string, filename?: string, userId?: string }
+  - Action: records an `AdUpload` with `remote=true` and `storagePath` set to the provided URL. The `processUploads` worker will later download and process the asset (transcode, thumbnail, insert `Ad`).
 
 Env vars required
-- CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN: YouTube OAuth2 creds
 - AUTH_TOKEN: simple bearer token for route access control
 - DATABASE_URL: your Postgres connection string (Prisma)
+- SUPABASE_* envs are required by the `processUploads` worker at runtime
 
 Notes
-- This implementation streams the remote asset directly into YouTube (no local disk). Ensure remote URL supports streaming/download.
-- Serverless platforms may have time and memory limits; for large videos consider a worker or uploading via a multi-step approach.
-- The route attempts to use `@prisma/adapter-pg` if available; otherwise it falls back to a standard PrismaClient.
+- The endpoint enqueues the URL; it does NOT perform remote uploads to third-party services.
+- The worker will validate duration (≤10s) and reject or mark uploads with errors if validation fails.
+- Keep `AUTH_TOKEN` secret and call the route from trusted automation or dashboards.
 
-Prisma model (add to `prisma/schema.prisma` if you don't have a `Video` model)
-
-model Video {
-  id         String   @id @default(uuid())
-  title      String?
-  youtubeUrl String?
-  status     String   @default("PENDING")
-  remoteUrl  String?
-  uploadedAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([status])
-  @@index([youtubeUrl])
-}
-
-Migration
-- After adding the model, run:
-  npx prisma generate
-  npx prisma migrate dev --name add_video_model
-
-Security
-- Keep `AUTH_TOKEN` secret and only call the route from trusted automation.
-- Consider additional checks (IP allowlist, OAuth service account) for production.
+Prisma notes
+- This endpoint writes to the existing `AdUpload` table; no new models are required. If you prefer, you can create an `Ad` record beforehand and pass `adId` when creating the upload to attach the processed video to an existing Ad.
 
 Limitations & improvements
-- Improve robust quota/error handling for YouTube uploads.
-- Use a background worker to retry failed uploads and to handle larger files.
-- Consider uploading to a storage bucket and allowing resumable uploads if needed.
+- Add rate limiting and request validation to this route in production.
+- Consider accepting an HMAC signature or client identity payload to authenticate different automation clients.

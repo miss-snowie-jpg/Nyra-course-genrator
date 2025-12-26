@@ -1,4 +1,4 @@
-name: Daily YouTube Upload
+name: Daily download ads
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  upload:
+  download:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -26,9 +26,8 @@ jobs:
       - name: Prepare folders
         run: |
           mkdir -p ./videos
-          mkdir -p ./done
 
-      - name: Fetch ads for upload (download short videos into ./videos)
+      - name: Fetch ads for download (download short videos into ./videos)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -36,21 +35,10 @@ jobs:
         run: |
           node scripts/fetch_ads_for_upload.js
 
-      - name: Run upload script
-        env:
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-          REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
-          DAILY_QUOTA: ${{ secrets.DAILY_QUOTA }}
-          UPLOAD_COST: ${{ secrets.UPLOAD_COST }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          node upload.js
-
-      - name: Upload log artifact
+      - name: Upload artifact for review
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: upload-logs
-          path: ./*.log || . | true
+          name: downloaded-videos
+          path: ./videos/**
+

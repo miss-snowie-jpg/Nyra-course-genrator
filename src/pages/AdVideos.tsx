@@ -19,6 +19,7 @@ type Video = {
 const curated: Video[] = [
   { id: "sample-1", title: "Rich Lifestyle Montage", description: "Fast-paced lifestyle montage with premium visuals", category: "Lifestyle" },
   { id: "sample-2", title: "Stylish Lifestyle Ad", description: "A lifestyle-focused ad with premium vibes", category: "Lifestyle" },
+  { id: "ig-DQKbFomj8Da", title: "Instagram Short Ad", description: "Instagram post: DQKbFomj8Da", category: "Lifestyle", sourceUrl: "https://www.instagram.com/p/DQKbFomj8Da/", durationSec: 8 },
   { id: "sample-3", title: "Aspirational Travel Ad", description: "Adventure and high-end travel visuals", category: "Lifestyle" },
   { id: "sample-4", title: "Bold Headline Ad", description: "Bold, energetic promo", category: "General" },
 ];

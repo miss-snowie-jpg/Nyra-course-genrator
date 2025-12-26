@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 /*
 Fetch up to N short ads (≤10s) from Supabase and download their processed video files to ./videos.
-Sets `youtubeQueuedAt` on selected Ad rows to avoid double-pick.
+This script no longer queues uploads to YouTube; it simply downloads assets for review or manual handling.
 Env vars required: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 Optional: MAX_UPLOADS (default 6)
 */
+
+
+
+
 
 const fs = require('fs')
 const path = require('path')
@@ -61,25 +65,8 @@ async function main() {
       fs.writeFileSync(filepath, buffer)
       console.log('Saved to', filepath)
 
-      // mark queued (set youtubeQueuedAt)
-      const patchUrl = `${SUPABASE_URL}/rest/v1/Ad?id=eq.${encodeURIComponent(id)}`
-      const now = new Date().toISOString()
-      const p = await fetch(patchUrl, {
-        method: 'PATCH',
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal'
-        },
-        body: JSON.stringify({ youtubeQueuedAt: now })
-      })
-      if (!p.ok) {
-        const t = await p.text().catch(() => '')
-        console.error('Failed to mark queued', id, p.status, t)
-      } else {
-        console.log('Marked queued', id)
-      }
+      // No longer marking YouTube queue fields; downloaded for manual handling or review
+      // If you want to mark these rows in the DB (e.g., set `downloadedAt`), add a patch here.
     } catch (e) {
       console.error('Error handling ad', ad, e)
     }

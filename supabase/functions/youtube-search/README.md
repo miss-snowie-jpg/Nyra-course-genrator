@@ -1,9 +1,9 @@
 YouTube Search Supabase Edge Function
 ====================================
 
-Purpose
+Purpose (optional / deprecated)
 -------
-This function proxies YouTube search requests so the API key can stay secret on the server.
+This function proxies YouTube search requests so the API key can stay secret on the server. Note: YouTube upload automation has been removed from this repo; this function is provided only if you still want to support YouTube search as an optional feature.
 
 Important environment secrets
 -----------------------------

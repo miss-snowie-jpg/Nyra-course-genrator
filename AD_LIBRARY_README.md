@@ -42,8 +42,8 @@ Daily ingest:
 - Configure feed URLs in `src/server/ad-sources.json`.
 - A GitHub Actions workflow `.github/workflows/ingest-daily.yml` runs `src/server/runIngest.ts` daily and inserts up to 6 new ads per run. Set `DATABASE_URL` in GitHub Secrets for the workflow to work.
 
-Daily uploads to YouTube:
-- A GitHub Actions workflow `.github/workflows/upload-daily.yml` runs `scripts/fetch_ads_for_upload.js` to download up to 6 short ads into `./videos`, then runs `upload.js` to upload them to YouTube. Add these repository secrets: `CLIENT_ID`, `CLIENT_SECRET`, `REFRESH_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Optionally set `DAILY_QUOTA` and `UPLOAD_COST` (defaults in `upload.js`).
+Daily uploads to YouTube: (disabled)
+- YouTube upload automation has been removed. The system now accepts user-supplied remote URLs which are enqueued for download and processing. Use the Supabase Edge Function `add-ad` or the API route `POST /api/upload-remote-video` (requires `AUTH_TOKEN`) to enqueue links; the `processUploads` worker will download, validate (≤10s), transcode, and create `Ad` records.
 
 New: Add-by-URL flow
 --------------------
