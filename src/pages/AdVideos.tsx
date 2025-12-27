@@ -174,47 +174,8 @@ const AdVideos = () => {
     }
   }
 
-// Edge function tester state and helper
-  const DEFAULT_EDGE_URL = import.meta.env.VITE_SUPABASE_URL ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-search` : ""
-  const [edgeUrl, setEdgeUrl] = useState<string>(DEFAULT_EDGE_URL)
-  const [edgeLoading, setEdgeLoading] = useState<boolean>(false)
-  const [edgeResponse, setEdgeResponse] = useState<string>("")
+// Edge function tester removed (dev-only UI); kept production code paths intact
 
-  async function sendToEdge() {
-    if (!edgeUrl) return
-    // Only allow same-origin URLs for the tester to avoid SSRF / open proxy misuse
-    try {
-      const urlObj = new URL(edgeUrl)
-      const allowedOrigins = [window.location.origin]
-      if (import.meta.env.VITE_SUPABASE_URL) {
-        try { allowedOrigins.push(new URL(import.meta.env.VITE_SUPABASE_URL).origin) } catch (e) {console.log(e)}
-      }
-      if (!allowedOrigins.includes(urlObj.origin)) {
-        setEdgeResponse('Error: Only requests to the same origin or the configured Supabase origin are allowed in this tester')
-        return
-      }
-    } catch (e) {
-      setEdgeResponse('Error: invalid URL')
-      return
-    }
-  
-
-    setEdgeLoading(true)
-    setEdgeResponse('')
-    try {
-      const res = await fetch(edgeUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: query }),
-      })
-      const text = await res.text()
-      setEdgeResponse(`Status: ${res.status}\n\n${text}`)
-    } catch (err) {
-      setEdgeResponse(`Error: ${err instanceof Error ? err.message : String(err)}`)
-    } finally {
-      setEdgeLoading(false)
-    }
-  }
 
   const shown = useMemo(() => {
     const base = useDynamic ? results : curated;
@@ -289,22 +250,7 @@ const AdVideos = () => {
         <div className="mb-6 rounded-md border border-border p-4">
           <p className="text-sm mb-0">Searches are performed against the internal Ad Library (curated + submitted). No external API keys are required.</p>
 
-          {/* Edge function tester: send a direct request to a deployed function and see raw response */}
-          <div className="mt-4 border-t pt-4">
-            <label className="text-sm text-muted-foreground">Edge Function URL (optional)</label>
-            <div className="flex gap-2 mt-2">
-              <Input placeholder="https://<project>.supabase.co/functions/v1/video-search" value={edgeUrl} onChange={(e) => setEdgeUrl((e.target as HTMLInputElement).value)} />
-              <Button onClick={sendToEdge} disabled={!edgeUrl || edgeLoading}>
-                {edgeLoading ? 'Sending...' : 'Send to Edge Function'}
-              </Button>
-              <Button variant="ghost" onClick={() => { setEdgeUrl(''); setEdgeResponse(''); }}>
-                Clear
-              </Button>
-            </div>
-            {edgeResponse && (
-              <pre className="mt-3 max-h-48 overflow-auto bg-slate-900/5 p-3 text-xs rounded">{edgeResponse}</pre>
-            )}
-          </div>
+
         </div>
 
         {error && <div className="mb-4 text-sm text-red-500">{error}</div>}
