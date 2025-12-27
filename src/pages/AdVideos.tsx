@@ -175,8 +175,8 @@ const AdVideos = () => {
   }
 
 // Edge function tester state and helper
-  const [edgeUrl, setEdgeUrl] = useState<string>("")
-  const [edgeResponse, setEdgeResponse] = useState<string>("")
+  const DEFAULT_EDGE_URL = import.meta.env.VITE_SUPABASE_URL ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-search` : ""
+  const [edgeUrl, setEdgeUrl] = useState<string>(DEFAULT_EDGE_URL)
   const [edgeLoading, setEdgeLoading] = useState<boolean>(false)
 
   async function sendToEdge() {
@@ -184,8 +184,12 @@ const AdVideos = () => {
     // Only allow same-origin URLs for the tester to avoid SSRF / open proxy misuse
     try {
       const urlObj = new URL(edgeUrl)
-      if (urlObj.origin !== window.location.origin) {
-        setEdgeResponse('Error: Only requests to the same origin are allowed in this tester')
+      const allowedOrigins = [window.location.origin]
+      if (import.meta.env.VITE_SUPABASE_URL) {
+        try { allowedOrigins.push(new URL(import.meta.env.VITE_SUPABASE_URL).origin) } catch (e) {}
+      }
+      if (!allowedOrigins.includes(urlObj.origin)) {
+        setEdgeResponse('Error: Only requests to the same origin or the configured Supabase origin are allowed in this tester')
         return
       }
     } catch (e) {
