@@ -178,6 +178,7 @@ const AdVideos = () => {
   const DEFAULT_EDGE_URL = import.meta.env.VITE_SUPABASE_URL ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/video-search` : ""
   const [edgeUrl, setEdgeUrl] = useState<string>(DEFAULT_EDGE_URL)
   const [edgeLoading, setEdgeLoading] = useState<boolean>(false)
+  const [edgeResponse, setEdgeResponse] = useState<string>("")
 
   async function sendToEdge() {
     if (!edgeUrl) return
@@ -186,7 +187,7 @@ const AdVideos = () => {
       const urlObj = new URL(edgeUrl)
       const allowedOrigins = [window.location.origin]
       if (import.meta.env.VITE_SUPABASE_URL) {
-        try { allowedOrigins.push(new URL(import.meta.env.VITE_SUPABASE_URL).origin) } catch (e) {}
+        try { allowedOrigins.push(new URL(import.meta.env.VITE_SUPABASE_URL).origin) } catch (e) {console.log(e)}
       }
       if (!allowedOrigins.includes(urlObj.origin)) {
         setEdgeResponse('Error: Only requests to the same origin or the configured Supabase origin are allowed in this tester')
@@ -196,6 +197,7 @@ const AdVideos = () => {
       setEdgeResponse('Error: invalid URL')
       return
     }
+  
 
     setEdgeLoading(true)
     setEdgeResponse('')
