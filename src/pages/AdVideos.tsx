@@ -20,6 +20,8 @@ const curated: Video[] = [
   { id: "sample-1", title: "Rich Lifestyle Montage", description: "Fast-paced lifestyle montage with premium visuals", category: "Lifestyle" },
   { id: "sample-2", title: "Stylish Lifestyle Ad", description: "A lifestyle-focused ad with premium vibes", category: "Lifestyle" },
   { id: "ig-DQKbFomj8Da", title: "Instagram Short Ad", description: "Instagram post: DQKbFomj8Da", category: "Lifestyle", sourceUrl: "https://www.instagram.com/p/DQKbFomj8Da/", durationSec: 8 },
+  { id: "ig-DSvDQqMjZW8", title: "Instagram Reel Ad", description: "Instagram reel: DSvDQqMjZW8", category: "Lifestyle", sourceUrl: "https://www.instagram.com/reel/DSvDQqMjZW8/?igsh=MWtseTM0ZDN6andzcQ==", durationSec: 9 },
+  { id: "ig-DSuJeLnjJlO", title: "Instagram Reel Ad", description: "Instagram reel: DSuJeLnjJlO", category: "Lifestyle", sourceUrl: "https://www.instagram.com/reel/DSuJeLnjJlO/?igsh=NmQ0cjdkbjltYWJv", durationSec: 9 },
   { id: "sample-3", title: "Aspirational Travel Ad", description: "Adventure and high-end travel visuals", category: "Lifestyle" },
   { id: "sample-4", title: "Bold Headline Ad", description: "Bold, energetic promo", category: "General" },
 ];
@@ -33,6 +35,12 @@ const AdVideos = () => {
     const [pageToken, setPageToken] = useState<string | null>(null);
     const [prevPageToken, setPrevPageToken] = useState<string | null>(null);
     const [selected, setSelected] = useState<Video | null>(null);
+
+  // Drafts (user-added, unpublished)
+  type DraftRow = { id: string; title?: string; description?: string; thumbnail?: string; source_url?: string; created_at?: string }
+  const [drafts, setDrafts] = useState<DraftRow[]>([])
+  const [loadingDrafts, setLoadingDrafts] = useState<boolean>(false)
+  const [editingDraft, setEditingDraft] = useState<DraftRow | null>(null)
 
   // Optional local API key for testing in environments without a server-side secret
   // No YouTube API key required. The app searches the internal ad library and user-submitted ads.
@@ -99,6 +107,73 @@ const AdVideos = () => {
     fetchVideos({ token: prevPageToken });
   };
 
+  // Fetch current user's drafts (user_added_ads where published=false)
+  const fetchMyDrafts = async () => {
+    setLoadingDrafts(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setDrafts([])
+        setLoadingDrafts(false)
+        return
+      }
+      // Types for custom table aren't available in the generated supabase client; ignore the type-check here
+      // @ts-expect-error - table not present in generated types
+      const { data, error } = await supabase.from('user_added_ads').select('*').eq('user_id', session.user.id).eq('published', false).order('created_at', { ascending: false })
+      if (error) throw error
+      setDrafts((data ?? []) as DraftRow[])
+    } catch (err) {
+      console.error('fetch drafts error', err)
+    } finally { setLoadingDrafts(false) }
+  }
+
+  // Import a shown video as a draft (unpublished)
+  const importAsDraft = async (v: Video) => {
+    try {
+      const body = { url: v.sourceUrl, title: v.title, description: v.description, thumbnail: v.thumbnail, published: false }
+      const res = await supabase.functions.invoke<{ inserted?: DraftRow }>('add-ad', { body })
+      if (res.error) throw res.error
+      const inserted = res.data?.inserted
+      if (inserted) {
+        // refresh drafts and open edit modal
+        await fetchMyDrafts()
+        setEditingDraft(inserted)
+      }
+    } catch (err) {
+      console.error('import error', err)
+      alert('Failed to import draft')
+    }
+  }
+
+  const updateDraft = async (payload: { id: string; title?: string; description?: string; thumbnail?: string; source_url?: string }) => {
+    try {
+      const res = await supabase.functions.invoke<{ updated?: DraftRow }>('update-ad', { body: payload })
+      if (res.error) throw res.error
+      if (res.data && res.data.updated) {
+        await fetchMyDrafts()
+        setEditingDraft(null)
+      }
+    } catch (err) {
+      console.error('update draft error', err)
+      alert('Failed to update draft')
+    }
+  }
+
+  const publishDraft = async (id: string) => {
+    try {
+      const res = await supabase.functions.invoke<{ ok?: boolean }>('publish-ad', { body: { id } })
+      if (res.error) throw res.error
+      if (res.data && res.data.ok) {
+        await fetchMyDrafts()
+        alert('Published')
+      }
+    } catch (err: unknown) {
+      console.error('publish error', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      alert(msg || 'Failed to publish. Make sure you have a paid plan.')
+    }
+  }
+
 // Edge function tester state and helper
   const [edgeUrl, setEdgeUrl] = useState<string>("")
   const [edgeResponse, setEdgeResponse] = useState<string>("")
@@ -130,6 +205,32 @@ const AdVideos = () => {
     if (shortOnly) list = list.filter((v) => (typeof v.durationSec === 'number' ? v.durationSec <= 10 : false));
     return list;
   }, [useDynamic, results, activeCategory, shortOnly]);
+
+  // Fetch drafts on mount and when auth state changes
+  useEffect(() => {
+    const loadDrafts = async () => {
+      setLoadingDrafts(true)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) { setDrafts([]); setLoadingDrafts(false); return }
+        // @ts-expect-error - table not present in generated types
+        const { data, error } = await supabase.from('user_added_ads').select('*').eq('user_id', session.user.id).eq('published', false).order('created_at', { ascending: false })
+        if (error) throw error
+        setDrafts((data ?? []) as DraftRow[])
+      } catch (e) {
+        console.error('load drafts error', e)
+      } finally {
+        setLoadingDrafts(false)
+      }
+    }
+
+    loadDrafts()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      loadDrafts()
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -190,6 +291,30 @@ const AdVideos = () => {
 
         {error && <div className="mb-4 text-sm text-red-500">{error}</div>}
 
+        {/* My Drafts */}
+        {drafts.length > 0 && (
+          <section className="mb-6">
+            <h2 className="text-lg font-semibold mb-2">My Drafts</h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {drafts.map((d) => (
+                <Card key={d.id} className="p-0 overflow-hidden">
+                  <div className="p-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="mb-1 text-lg font-semibold">{d.title || 'Untitled'}</h3>
+                      <span className="text-xs rounded-full bg-muted/10 px-2 py-1">Draft</span>
+                    </div>
+                    <p className="mb-3 text-sm text-muted-foreground">{d.description}</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => setEditingDraft(d)}>Edit</Button>
+                      <Button size="sm" variant="secondary" onClick={() => publishDraft(d.id)}>Publish</Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
+
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {(shown.length === 0 && !loading) ? (
             <div className="text-muted-foreground">No videos to show. Try searching or switch to curated list.</div>
@@ -213,7 +338,12 @@ const AdVideos = () => {
                   </div>
                   <p className="mb-3 text-sm text-muted-foreground">{v.description}</p>
                   <div className="flex justify-between items-center">
-                    <Button size="sm" onClick={() => setSelected(v)}>Preview</Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => setSelected(v)}>Preview</Button>
+                      {v.sourceUrl && (
+                        <Button size="sm" variant="ghost" onClick={() => importAsDraft(v)}>Import as Draft</Button>
+                      )}
+                    </div>
                     {v.thumbnail && <img src={v.thumbnail} alt="thumb" className="w-20 h-12 object-cover rounded" />}
                   </div>
                 </div>
@@ -221,6 +351,29 @@ const AdVideos = () => {
             ))
           )}
         </div>
+
+        {editingDraft && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60" onClick={() => setEditingDraft(null)}>
+            <div className="bg-white p-4 max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-2 flex justify-between">
+                <div />
+                <Button variant="ghost" onClick={() => setEditingDraft(null)}>Close</Button>
+              </div>
+
+              <div className="space-y-3">
+                <Input value={editingDraft.title || ''} onChange={(e) => setEditingDraft({ ...editingDraft, title: (e.target as HTMLInputElement).value })} placeholder="Title" />
+                <Input value={editingDraft.thumbnail || ''} onChange={(e) => setEditingDraft({ ...editingDraft, thumbnail: (e.target as HTMLInputElement).value })} placeholder="Thumbnail URL" />
+                <Input value={editingDraft.source_url || ''} onChange={(e) => setEditingDraft({ ...editingDraft, source_url: (e.target as HTMLInputElement).value })} placeholder="Source URL" />
+                <textarea className="w-full rounded border p-2" value={editingDraft.description || ''} onChange={(e) => setEditingDraft({ ...editingDraft, description: (e.target as HTMLTextAreaElement).value })} placeholder="Description" />
+
+                <div className="flex gap-2">
+                  <Button onClick={() => updateDraft({ id: editingDraft.id, title: editingDraft.title, description: editingDraft.description, thumbnail: editingDraft.thumbnail, source_url: editingDraft.source_url })}>Save Draft</Button>
+                  <Button variant="secondary" onClick={() => publishDraft(editingDraft.id)}>Publish</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {selected && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60" onClick={() => setSelected(null)}>

@@ -2,6 +2,7 @@ import React from 'react'
 import AdCard from '../components/AdLibrary/AdCard'
 import Filters from '../components/AdLibrary/Filters'
 import VideoPlayer from '../components/AdLibrary/VideoPlayer'
+import VideoEditor from '../components/AdLibrary/VideoEditor'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/integrations/supabase/client'
@@ -20,6 +21,11 @@ export default function AdLibraryPage() {
   const [selected, setSelected] = React.useState<string | null>(null)
   const [previewSrc, setPreviewSrc] = React.useState<string | null>(null)
   const [previewTitle, setPreviewTitle] = React.useState<string | null>(null)
+
+  // Editor state
+  const [editorOpen, setEditorOpen] = React.useState(false)
+  const [editorAdId, setEditorAdId] = React.useState<string | null>(null)
+  const [editorSrc, setEditorSrc] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     fetchAds()
@@ -51,6 +57,32 @@ export default function AdLibraryPage() {
       const ad = data.ad
       setPreviewSrc(ad?.sourceUrl || ad?.source_url || null)
       setPreviewTitle(ad?.title || null)
+    }
+  }
+
+  async function openEditor(id: string) {
+    // Verify paid status server-side
+    try {
+      const r = await fetch('/supabase/functions/v1/verify-paid', { method: 'POST' })
+      if (r.status === 402) {
+        alert('Publishing and editing require a paid plan. Visit Checkout to upgrade.')
+        return
+      }
+      if (!r.ok) throw new Error('Failed to verify billing')
+      // Fetch ad metadata and open editor
+      const res = await fetch(`/supabase/functions/v1/get-ad?id=${encodeURIComponent(id)}`)
+      if (res.ok) {
+        const data = await res.json()
+        const ad = data.ad
+        setEditorAdId(id)
+        setEditorSrc(ad?.sourceUrl || ad?.source_url || null)
+        setEditorOpen(true)
+      } else {
+        alert('Failed to fetch ad metadata')
+      }
+    } catch (err) {
+      console.error('verify paid or open editor failed', err)
+      alert('Failed to open editor')
     }
   }
 
@@ -106,7 +138,7 @@ export default function AdLibraryPage() {
         <div className="flex-1">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {ads.map((a) => (
-              <AdCard key={a.id} {...a} onOpen={openAd} />
+              <AdCard key={a.id} {...a} onOpen={openAd} onEdit={openEditor} />
             ))}
           </div>
         </div>
@@ -116,6 +148,10 @@ export default function AdLibraryPage() {
       </div>
 
       {/* TODO: Add pagination, sorting, and AI remix hooks for derivative ads */}
+
+      {editorOpen && editorSrc && (
+        <VideoEditor src={editorSrc} onClose={() => setEditorOpen(false)} onExported={(blob) => { console.log('Exported blob', blob); setEditorOpen(false) }} />
+      )}
     </div>
   )
 }

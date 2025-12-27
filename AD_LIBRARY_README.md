@@ -65,6 +65,22 @@ AI Remix (future)
 - TODO: Add a `/ad-library/:id/remix` endpoint that uses AI to create derivative cuts and captions.
 - TODO: Add a remix job queue and asset storage; store remix metadata linked to original `Ad`.
 
+Video Editor & Paid Export
+--------------------------
+- Implemented `VideoEditor` component (browser-side FFmpeg.wasm) at `src/components/AdLibrary/VideoEditor.tsx`.
+  - Features: trim (start/end), text overlay (headline + CTA), aspect ratio conversion (9:16, 1:1, 16:9), export -> downloadable MP4.
+  - Uses `@ffmpeg/ffmpeg` in the browser (dynamic import); add `npm install @ffmpeg/ffmpeg` to your project.
+- Billing & permissions: a Supabase Edge Function `verify-paid` was added (`supabase/functions/verify-paid`) and is used to restrict editing/export to paid users.
+- Implementation notes & caveats:
+  - The editor downloads the source video directly from the public internet URL in the browser. For large sources this can be slow and memory-heavy; for production consider server-side transient processing and signed storage for reliability.
+  - Text overlay uses ffmpeg `drawtext`; some FFmpeg wasm builds may not include all text/font features. The implementation includes fallback behavior when filters are not available.
+  - Exports are generated client-side and offered as a single downloadable MP4; Nyra does not post to social media on the user's behalf.
+
+Future improvements (short-term):
+- Server-side export fallback for very large videos (streaming transcode worker to handle memory constraints).
+- Add font selection and richer captions (animated overlays).
+- Add server-side export signing to allow robust resumes and retries.
+
 Files added
 -----------
 - `prisma/schema.prisma`

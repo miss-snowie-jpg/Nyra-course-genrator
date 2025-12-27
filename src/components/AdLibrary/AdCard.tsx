@@ -7,10 +7,12 @@ type Props = {
   thumbnail?: string
   platform?: string
   durationSec?: number
+  sourceUrl?: string | null
   onOpen: (id: string) => void
+  onEdit?: (id: string) => void
 }
 
-export const AdCard: React.FC<Props> = ({ id, title, thumbnail, platform, durationSec, onOpen }) => {
+export const AdCard: React.FC<Props> = ({ id, title, thumbnail, platform, durationSec, sourceUrl, onOpen, onEdit }) => {
   const [saving, setSaving] = React.useState(false)
 
   async function toggleSave() {
@@ -46,6 +48,9 @@ export const AdCard: React.FC<Props> = ({ id, title, thumbnail, platform, durati
           </button>
           <div className="flex gap-2">
             <button onClick={() => onOpen(id)} className="text-sm text-gray-600">Preview</button>
+            {onEdit && sourceUrl && (
+              <button onClick={(e) => { e.stopPropagation(); onEdit(id) }} className="text-sm text-green-600">Edit</button>
+            )}
             <button onClick={async (e) => {
               e.stopPropagation()
               const session = await supabase.auth.getSession()

@@ -87,17 +87,35 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'Supabase config missing on function' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
     }
 
+    // If caller passed an Authorization header (logged-in user), fetch user info
+    let userId: string | null = null
+    try {
+      const authHeader = req.headers.get('authorization') || ''
+      if (authHeader.startsWith('Bearer ')) {
+        const ures = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { Authorization: authHeader } })
+        if (ures.ok) {
+          const ujson = await ures.json()
+          userId = ujson?.id || null
+        }
+      }
+    } catch (e) {
+      console.warn('auth check failed', e)
+    }
+
     // Compose row
-    const row = {
+    type AddRow = { user_id?: string | null; title: string; description?: string | null; source_url: string; thumbnail?: string | null; platform?: string; source_type?: string; published?: boolean; created_at?: string }
+    const row: AddRow = {
       title: body?.title || meta.title || '',
       description: body?.description || meta.description || '',
       source_url: url,
       thumbnail: body?.thumbnail || meta.thumbnail || null,
       platform: body?.platform || meta.platform || 'UNKNOWN',
       source_type: 'USER_URL',
-      published: true,
+      published: typeof body?.published === 'boolean' ? body.published : true,
       created_at: new Date().toISOString(),
     }
+
+    if (userId) row.user_id = userId
 
     // Use Supabase REST to insert row
     const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/user_added_ads`, {

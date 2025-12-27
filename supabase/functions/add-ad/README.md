@@ -13,6 +13,7 @@ SQL to create `user_added_ads` table (run in Supabase SQL editor):
 ```sql
 create table if not exists public.user_added_ads (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid, -- optional, set when caller provides a valid auth token
   title text,
   description text,
   source_url text not null,
@@ -20,8 +21,11 @@ create table if not exists public.user_added_ads (
   platform text,
   source_type text,
   published boolean default true,
-  created_at timestamp with time zone default now()
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone
 );
+
+-- Note: to support draft workflow, set `published` to false when creating a draft
 ```
 
 Deploy:
