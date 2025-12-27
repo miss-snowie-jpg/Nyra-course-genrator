@@ -8,7 +8,7 @@ This function proxies YouTube search requests so the API key can stay secret on 
 Important environment secrets
 -----------------------------
 - `YOUTUBE_API_KEY` (required) — YouTube Data API v3 key
-- `ALLOWED_ORIGIN` (optional) — a single origin (e.g., `https://nyra-ai-56.lovable.app`) to restrict CORS. If not set, `*` is used.
+- `ALLOWED_ORIGIN` (recommended) — set this to the single origin of your frontend (e.g., `https://nyra-ai-56.lovable.app`) to restrict CORS. If set, requests from any other origins will be rejected with a 403. If you intentionally want to allow any origin for quick testing, set it to `*` (not recommended for production).
 
 Deploy (Supabase CLI)
 ---------------------

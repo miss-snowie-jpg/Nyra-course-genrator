@@ -47,6 +47,13 @@ const Auth = () => {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Basic client-side password policy to reduce weak passwords
+    if (!password || password.length < 8) {
+      toast.error('Password must be at least 8 characters long')
+      return
+    }
+
     setLoading(true);
 
     try {

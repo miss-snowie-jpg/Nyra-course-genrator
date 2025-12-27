@@ -23,7 +23,40 @@ serve(async (req: Request) => {
     if (!ures.ok) return new Response(JSON.stringify({ error: 'Invalid auth token' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
     const ujson = await ures.json()
 
-    // Billing check: accept either user_metadata.is_paid === true or user_metadata.plan !== 'free'
+    // First try Dodo-based verification if configured
+    const DODO_API_KEY = deno?.env?.get('DODO_API_KEY')
+    const DODO_PRODUCT_ID = deno?.env?.get('DODO_PRODUCT_ID')
+    const DODO_API_BASE = deno?.env?.get('DODO_API_BASE') || 'https://api.dodopayments.com/v1'
+
+    const email = ujson?.email || ujson?.user?.email || (ujson?.user_metadata && ujson.user_metadata.email)
+
+    if (DODO_API_KEY && DODO_PRODUCT_ID) {
+      try {
+        if (!email) {
+          console.warn('verify-paid: user email not available for Dodo verification')
+        } else {
+          // Best-effort Dodo check: query payments endpoint for the product and customer email
+          const url = `${DODO_API_BASE}/payments?product_id=${encodeURIComponent(DODO_PRODUCT_ID)}&customer_email=${encodeURIComponent(email)}`
+          const res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${DODO_API_KEY}`, 'Content-Type': 'application/json' } })
+          if (res.ok) {
+            const j = await res.json().catch(() => null)
+            // Accept if any payment object indicates success (best-effort keys)
+            const payments = Array.isArray(j) ? j : (j?.data || [])
+            const ok = payments.some((p: any) => {
+              const s = String(p.status || p.state || p.result || '').toLowerCase()
+              return s === 'succeeded' || s === 'paid' || s === 'completed' || s === 'success'
+            })
+            if (ok) return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+          } else {
+            console.warn('Dodo verify responded', res.status, await res.text().catch(() => ''))
+          }
+        }
+      } catch (e) {
+        console.error('Dodo verify error', e)
+      }
+    }
+
+    // Fallback: Billing check: accept either user_metadata.is_paid === true or user_metadata.plan !== 'free'
     const isPaid = (ujson?.user_metadata && (ujson.user_metadata.is_paid === true || (ujson.user_metadata.plan && ujson.user_metadata.plan !== 'free')))
     if (!isPaid) {
       return new Response(JSON.stringify({ error: 'Payment required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 402 })

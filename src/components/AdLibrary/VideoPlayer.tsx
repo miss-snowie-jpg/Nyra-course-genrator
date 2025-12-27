@@ -39,9 +39,8 @@ export const VideoPlayer: React.FC<Props> = ({ src, adId, filename }) => {
       try {
         const res = await fetch(`/supabase/functions/v1/download-ad?id=${encodeURIComponent(adId)}&mode=preview`)
         if (res.status === 202) {
-          // queued for processing
-          setProcessing('Processing preview. Will retry shortly.')
-          // poll get-ad every 2s up to 10 times
+          // queued for processing; poll get-ad every 2s up to 10 times
+          setProcessing('queued')
           for (let i = 0; i < 10 && active; i++) {
             await new Promise(r => setTimeout(r, 2000))
             const gad = await fetch(`/supabase/functions/v1/get-ad?id=${encodeURIComponent(adId)}`)
@@ -49,13 +48,19 @@ export const VideoPlayer: React.FC<Props> = ({ src, adId, filename }) => {
             const j = await gad.json()
             const ad = j.ad
             const newSrc = ad?.sourceUrl || ad?.source_url
-            if (newSrc && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(newSrc) || (newSrc && newSrc.includes('/storage/v1/object/public/'))) {
+            if (newSrc && (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(newSrc) || newSrc.includes('/storage/v1/object/public/'))) {
               setProcessing(null)
               setVideoSrc(newSrc)
               break
             }
+            // show thumbnail fallback while processing if available
+            if (ad?.thumbnail && !newSrc) {
+              setEmbedHtml(`<img src="${encodeURI(ad.thumbnail)}" alt="${(ad.title || 'preview').replace(/"/g,'')}" style="max-width:100%;height:auto;display:block;margin:0 auto;" />`)
+            }
           }
-          if (active && processing) setEmbedError('Preview will be available once processing completes.')
+
+          setProcessing(null)
+          if (active && !videoSrc) setEmbedError('Preview will be available once processing completes.')
           return
         }
 
@@ -82,8 +87,19 @@ export const VideoPlayer: React.FC<Props> = ({ src, adId, filename }) => {
         if (!res.ok) throw new Error('noembed failed')
         const j = await res.json()
         if (j && j.html) {
-          setEmbedHtml(j.html)
-          setEmbedError(null)
+          // sanitize embed HTML (strip scripts and use DOMPurify if available in the browser)
+          try {
+            let cleanHtml = j.html.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+            if (typeof window !== 'undefined') {
+              const DOMPurify = (await import('dompurify')).default
+              cleanHtml = DOMPurify.sanitize(cleanHtml, { ADD_TAGS: ['iframe'], ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling'] })
+            }
+            setEmbedHtml(cleanHtml)
+            setEmbedError(null)
+          } catch (e) {
+            setEmbedHtml(null)
+            setEmbedError('Embed content not safe')
+          }
         } else {
           setEmbedHtml(null)
           setEmbedError('No embed available')
@@ -103,7 +119,7 @@ export const VideoPlayer: React.FC<Props> = ({ src, adId, filename }) => {
     fetchPreviewViaServer()
 
     return () => { active = false; if (objUrl) URL.revokeObjectURL(objUrl) }
-  }, [src, adId])
+  }, [src, adId, videoSrc])
 
   const handleDownloadClick = (e: React.MouseEvent) => {
     if (!isPaid) {
@@ -126,6 +142,13 @@ export const VideoPlayer: React.FC<Props> = ({ src, adId, filename }) => {
       )}
 
       {embedError && <div className="text-sm text-muted-foreground mt-2">{embedError}</div>}
+
+      {/* If preview/embed not available, offer a direct "Open source" link so the user can view the source page */}
+      {!videoSrc && !embedHtml && src && (
+        <div className="mt-2 text-right">
+          <a href={src} target="_blank" rel="noopener noreferrer" className="text-sm underline">Open source</a>
+        </div>
+      )}
 
       <div className="p-2 flex justify-end gap-2">
         {isPaid ? (

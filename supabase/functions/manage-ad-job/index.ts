@@ -24,7 +24,33 @@ serve(async (req: Request) => {
     const SUPABASE_SERVICE_KEY = deno?.env?.get('SUPABASE_SERVICE_ROLE_KEY')
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return new Response(JSON.stringify({ error: 'Supabase config missing' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
 
+    // Enforce authentication: require an Authorization: Bearer <token> header and validate it
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader) return new Response(JSON.stringify({ error: 'Authorization required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
+
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { Authorization: authHeader, 'apikey': SUPABASE_SERVICE_KEY } })
+    if (!userRes.ok) return new Response(JSON.stringify({ error: 'Invalid or expired token' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
+    const user = await userRes.json()
+    const userId = user?.id
+    if (!userId) return new Response(JSON.stringify({ error: 'Unauthorized' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
+
+    // Helper: check that the authenticated user owns the ad (if ad record has user_id). Deny if not owner.
+    async function assertOwnerOrDeny(adIdToCheck: string | number) {
+      const ares = await fetch(`${SUPABASE_URL}/rest/v1/Ad?id=eq.${encodeURIComponent(String(adIdToCheck))}&select=user_id`, { headers: new Headers({ 'apikey': SUPABASE_SERVICE_KEY ?? '', 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY ?? ''}` }) })
+      if (ares.ok) {
+        const arr = await ares.json()
+        const adRec = Array.isArray(arr) ? arr[0] : arr
+        if (adRec && adRec.user_id && adRec.user_id !== userId) {
+          return new Response(JSON.stringify({ error: 'Forbidden' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 })
+        }
+      }
+      return null
+    }
+
     if (action === 'stop') {
+      const ownerCheck = await assertOwnerOrDeny(adId)
+      if (ownerCheck) return ownerCheck
+
       const r = await fetch(`${SUPABASE_URL}/rest/v1/ad_jobs?adId=eq.${adId}`, { method: 'PATCH', headers: { 'apikey': SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ active: false }), })
       const text = await r.text()
       if (!r.ok) return new Response(JSON.stringify({ error: 'Failed to stop job', detail: text }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 502 })
@@ -34,6 +60,9 @@ serve(async (req: Request) => {
     // Create or update job for adId/type
     const typeVal = type || 'REPOST'
     const interval = intervalMin || 1440
+
+    const ownerCheck = await assertOwnerOrDeny(adId)
+    if (ownerCheck) return ownerCheck
 
     const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/ad_jobs`, { method: 'POST', headers: { 'apikey': SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ adId, type: typeVal, intervalMin: interval, active: true }) })
     const text = await upsertRes.text()

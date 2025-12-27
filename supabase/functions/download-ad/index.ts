@@ -23,6 +23,32 @@ serve(async (req: Request) => {
     const SUPABASE_SERVICE_KEY = deno?.env?.get('SUPABASE_SERVICE_ROLE_KEY')
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return new Response(JSON.stringify({ error: 'Supabase config missing' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
 
+    // Respect an optional ALLOWED_ORIGIN env var to tighten CORS in production (defaults to request origin or '*')
+    const ALLOWED_ORIGIN = deno?.env?.get('ALLOWED_ORIGIN')
+    if (ALLOWED_ORIGIN && ALLOWED_ORIGIN !== '*') corsHeaders['Access-Control-Allow-Origin'] = ALLOWED_ORIGIN
+    else if (req.headers.get('origin')) corsHeaders['Access-Control-Allow-Origin'] = req.headers.get('origin') || '*'
+
+    // If this is a download (mode !== 'preview') require an Authorization header and verify the user
+    if (mode !== 'preview') {
+      const authHeader = req.headers.get('authorization')
+      if (!authHeader) return new Response(JSON.stringify({ error: 'Authorization required for download' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
+
+      const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { Authorization: authHeader, 'apikey': SUPABASE_SERVICE_KEY } })
+      if (!userRes.ok) return new Response(JSON.stringify({ error: 'Invalid or expired token' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
+      const user = await userRes.json()
+      if (!user?.id) return new Response(JSON.stringify({ error: 'Unauthorized' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
+
+      // ensure the user owns the ad if the ad has a user_id
+      const ownerRes = await fetch(`${SUPABASE_URL}/rest/v1/Ad?id=eq.${encodeURIComponent(id)}&select=user_id`, { headers: { 'apikey': SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}` } })
+      if (ownerRes.ok) {
+        const arr = await ownerRes.json()
+        const adRec = Array.isArray(arr) ? arr[0] : arr
+        if (adRec && adRec.user_id && adRec.user_id !== user.id) {
+          return new Response(JSON.stringify({ error: 'Forbidden' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 })
+        }
+      }
+    }
+
     // Fetch ad record
     const res = await fetch(`${SUPABASE_URL}/rest/v1/Ad?id=eq.${encodeURIComponent(id)}&select=*`, {
       method: 'GET',

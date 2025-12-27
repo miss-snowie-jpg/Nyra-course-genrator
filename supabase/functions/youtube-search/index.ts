@@ -7,20 +7,41 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 
 
-// Allow configuration of the origin via a secret `ALLOWED_ORIGIN` (set to a specific origin to restrict CORS, or leave empty for '*')
-const allowedOrigin = (globalThis as unknown as { Deno?: { env?: { get(name: string): string | undefined } } }).Deno?.env?.get('ALLOWED_ORIGIN') || '*'
+// Allow configuration of the origin via a secret `ALLOWED_ORIGIN` (set to a specific origin to restrict CORS; if unset, '*' is used)
+const configuredOrigin = (globalThis as unknown as { Deno?: { env?: { get(name: string): string | undefined } } }).Deno?.env?.get('ALLOWED_ORIGIN') || '*'
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": allowedOrigin,
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Max-Age": "600",
-};
+function buildCorsHeaders(origin: string | null) {
+  // If a specific origin is configured, only echo that origin when the request origin matches
+  const isWildcard = configuredOrigin === '*'
+  const allowOrigin = isWildcard ? '*' : (origin || configuredOrigin)
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, content-type',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Max-Age': '600',
+    'Vary': 'Origin',
+  }
+  if (!isWildcard) headers['Access-Control-Allow-Credentials'] = 'true'
+  return headers
+}
 
 serve(async (req: Request) => {
+  const reqOrigin = req.headers.get('origin')
+
+  // If a specific origin is set and the request's origin doesn't match, reject the request.
+  if (configuredOrigin !== '*' && reqOrigin && reqOrigin !== configuredOrigin) {
+    // Minimal response without sensitive details
+    return new Response(JSON.stringify({ error: 'Origin not allowed' }), { headers: { 'Content-Type': 'application/json' }, status: 403 })
+  }
+
   if (req.method === 'OPTIONS') {
     // Respond to preflight with 204 No Content and proper CORS headers
-    return new Response(null, { headers: corsHeaders, status: 204 })
+    return new Response(null, { headers: buildCorsHeaders(reqOrigin), status: 204 })
+  }
+
+  // Restrict methods to reduce attack surface
+  if (req.method !== 'GET' && req.method !== 'OPTIONS') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { headers: { 'Content-Type': 'application/json' }, status: 405 })
   }
 
   try {
@@ -28,7 +49,7 @@ serve(async (req: Request) => {
     const YOUTUBE_API_KEY = deno?.env?.get('YOUTUBE_API_KEY')
     if (!YOUTUBE_API_KEY) {
       return new Response(JSON.stringify({ error: 'YOUTUBE_API_KEY is not set on the server' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...buildCorsHeaders(reqOrigin), 'Content-Type': 'application/json' },
         status: 500,
       })
     }
@@ -64,7 +85,7 @@ serve(async (req: Request) => {
       const text = await ytRes.text()
       console.error('YouTube API error', ytRes.status, text)
       return new Response(JSON.stringify({ error: `YouTube API error: ${ytRes.status}` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...buildCorsHeaders(reqOrigin), 'Content-Type': 'application/json' },
         status: 502,
       })
     }
@@ -83,12 +104,12 @@ serve(async (req: Request) => {
     })
 
     return new Response(JSON.stringify({ items, nextPageToken: data.nextPageToken ?? null, prevPageToken: data.prevPageToken ?? null }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...buildCorsHeaders(reqOrigin), 'Content-Type': 'application/json' },
     })
   } catch (error) {
     console.error('youtube-search function error:', error)
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...buildCorsHeaders(reqOrigin), 'Content-Type': 'application/json' },
       status: 500,
     })
   }

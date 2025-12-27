@@ -181,6 +181,18 @@ const AdVideos = () => {
 
   async function sendToEdge() {
     if (!edgeUrl) return
+    // Only allow same-origin URLs for the tester to avoid SSRF / open proxy misuse
+    try {
+      const urlObj = new URL(edgeUrl)
+      if (urlObj.origin !== window.location.origin) {
+        setEdgeResponse('Error: Only requests to the same origin are allowed in this tester')
+        return
+      }
+    } catch (e) {
+      setEdgeResponse('Error: invalid URL')
+      return
+    }
+
     setEdgeLoading(true)
     setEdgeResponse('')
     try {
