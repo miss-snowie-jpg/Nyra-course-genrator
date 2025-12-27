@@ -382,7 +382,7 @@ const AdVideos = () => {
                 <Button variant="ghost" onClick={() => setSelected(null)}>Close</Button>
               </div>
               {selected.sourceUrl ? (
-                <VideoPlayer src={selected.sourceUrl} />
+                <VideoPlayer src={selected.sourceUrl} adId={selected.id} />
               ) : (
                 <div className="p-6">No preview available for this ad.</div>
               )}

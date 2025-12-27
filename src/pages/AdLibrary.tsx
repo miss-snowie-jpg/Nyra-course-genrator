@@ -143,7 +143,7 @@ export default function AdLibraryPage() {
           </div>
         </div>
         <div className="w-96">
-          {previewSrc ? <VideoPlayer src={previewSrc} filename={previewTitle ?? undefined} /> : <div className="p-4 bg-white rounded shadow">Select an ad to preview</div>}
+          {previewSrc ? <VideoPlayer src={previewSrc} adId={selected ?? undefined} filename={previewTitle ?? undefined} /> : <div className="p-4 bg-white rounded shadow">Select an ad to preview</div>}
         </div>
       </div>
 
