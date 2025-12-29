@@ -19,11 +19,6 @@ const Landing = () => {
       description: "Get a beautiful, SEO-optimized course website with zero coding required"
     },
     {
-      icon: DollarSign,
-      title: "Built-in Monetization",
-      description: "Accept payments and subscriptions with integrated payment processing"
-    },
-    {
       icon: BarChart,
       title: "Growth Analytics",
       description: "Track traffic, sales, and revenue with real-time insights"
@@ -152,86 +147,6 @@ const Landing = () => {
               </div>
             </Card>
           ))}
-        </div>
-      </section>
-
-      {/* Video Generation Section */}
-      <section className="relative overflow-hidden py-20">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-background to-primary/10" />
-        
-        <div className="container relative mx-auto px-4">
-          <div className="mx-auto max-w-5xl">
-            <div className="mb-12 text-center">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-sm backdrop-blur-sm">
-                <Video className="h-4 w-4 text-accent" />
-                <span>AI Video Generator</span>
-              </div>
-              <h2 className="mb-4 text-4xl font-bold md:text-5xl">Create Engaging Video Content</h2>
-              <p className="text-xl text-muted-foreground">
-                Generate professional course videos with AI—no camera or editing skills needed
-              </p>
-            </div>
-
-            <Card className="overflow-hidden border-accent/30 bg-gradient-to-br from-accent/5 via-card to-primary/5 backdrop-blur-sm">
-              <div className="grid items-center gap-8 p-8 md:grid-cols-2">
-                <div>
-                  <div className="mb-6 space-y-4">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1 rounded-full bg-accent/20 p-2">
-                        <Play className="h-4 w-4 text-accent" />
-                      </div>
-                      <div>
-                        <h3 className="mb-1 font-semibold">Text-to-Video AI</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Transform your course scripts into engaging video content
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1 rounded-full bg-primary/20 p-2">
-                        <Sparkles className="h-4 w-4 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="mb-1 font-semibold">Multiple Styles</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Choose from various visual styles to match your brand
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1 rounded-full bg-accent/20 p-2">
-                        <Zap className="h-4 w-4 text-accent" />
-                      </div>
-                      <div>
-                        <h3 className="mb-1 font-semibold">Fast Generation</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Create high-quality videos in minutes, not hours
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <Button 
-                    size="lg" 
-                    className="w-full bg-gradient-to-r from-accent to-primary md:w-auto"
-                    onClick={() => navigate('/auth')}
-                  >
-                    <Video className="mr-2 h-5 w-5" />
-                    Try Video Generator
-                  </Button>
-                </div>
-                <div className="relative aspect-video overflow-hidden rounded-lg border border-border/50 bg-gradient-to-br from-accent/10 to-primary/10">
-                  <div className="flex h-full items-center justify-center">
-                    <div className="text-center">
-                      <div className="mx-auto mb-4 inline-flex rounded-full bg-background/50 p-6 backdrop-blur-sm">
-                        <Video className="h-12 w-12 text-accent" />
-                      </div>
-                      <p className="text-sm text-muted-foreground">AI Video Preview</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
         </div>
       </section>
 

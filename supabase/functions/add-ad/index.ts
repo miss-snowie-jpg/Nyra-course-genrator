@@ -1,24 +1,9 @@
-// @ts-expect-error: Deno std types are available in the Edge runtime
+// add-ad Supabase Edge Function removed on 2025-12-29
+// This function was part of the Ad Library which has been hard-deleted.
+// Keep a minimal handler so deployments referencing this file won't fail.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "600",
-};
-
-serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders, status: 204 })
-  }
-
-  try {
-    const body = await req.json().catch(() => ({}))
-    const url = body?.url
-    if (!url) {
-      return new Response(JSON.stringify({ error: 'Missing url in request body' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
-    }
+serve(() => new Response(JSON.stringify({ error: 'add-ad function removed' }), { status: 410, headers: { 'Content-Type': 'application/json' } }))
 
     // Simple metadata extractor: support YouTube links via oEmbed or YouTube Data API
     // Prefer server-side YT key via YOUTUBE_API_KEY env for more reliable metadata
