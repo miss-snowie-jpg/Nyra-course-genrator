@@ -1,4 +1,3 @@
-// @ts-expect-error: Deno std types are available in the Edge runtime
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
@@ -19,9 +18,8 @@ serve(async (req: Request) => {
     if (!adId) return new Response(JSON.stringify({ error: 'adId is required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
 
     // Use Supabase REST to create/update ad_jobs table
-    const deno = (globalThis as unknown as { Deno?: { env?: { get(name: string): string | undefined } } }).Deno
-    const SUPABASE_URL = deno?.env?.get('SUPABASE_URL')
-    const SUPABASE_SERVICE_KEY = deno?.env?.get('SUPABASE_SERVICE_ROLE_KEY')
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+    const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return new Response(JSON.stringify({ error: 'Supabase config missing' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
 
     // Enforce authentication: require an Authorization: Bearer <token> header and validate it

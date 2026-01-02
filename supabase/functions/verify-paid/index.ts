@@ -1,4 +1,3 @@
-// @ts-expect-error: Deno std types are available in the Edge runtime
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
@@ -12,8 +11,7 @@ serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders, status: 204 })
 
   try {
-    const deno = (globalThis as unknown as { Deno?: { env?: { get(name: string): string | undefined } } }).Deno
-    const SUPABASE_URL = deno?.env?.get('SUPABASE_URL')
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
     if (!SUPABASE_URL) return new Response(JSON.stringify({ error: 'Supabase config missing' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
 
     const authHeader = req.headers.get('authorization') || ''
@@ -24,9 +22,9 @@ serve(async (req: Request) => {
     const ujson = await ures.json()
 
     // First try Dodo-based verification if configured
-    const DODO_API_KEY = deno?.env?.get('DODO_API_KEY')
-    const DODO_PRODUCT_ID = deno?.env?.get('DODO_PRODUCT_ID')
-    const DODO_API_BASE = deno?.env?.get('DODO_API_BASE') || 'https://api.dodopayments.com/v1'
+    const DODO_API_KEY = Deno.env.get('DODO_API_KEY')
+    const DODO_PRODUCT_ID = Deno.env.get('DODO_PRODUCT_ID')
+    const DODO_API_BASE = Deno.env.get('DODO_API_BASE') || 'https://api.dodopayments.com/v1'
 
     const email = ujson?.email || ujson?.user?.email || (ujson?.user_metadata && ujson.user_metadata.email)
 
@@ -42,7 +40,7 @@ serve(async (req: Request) => {
             const j = await res.json().catch(() => null)
             // Accept if any payment object indicates success (best-effort keys)
             const payments = Array.isArray(j) ? j : (j?.data || [])
-            const ok = payments.some((p: any) => {
+            const ok = payments.some((p: Record<string, unknown>) => {
               const s = String(p.status || p.state || p.result || '').toLowerCase()
               return s === 'succeeded' || s === 'paid' || s === 'completed' || s === 'success'
             })
