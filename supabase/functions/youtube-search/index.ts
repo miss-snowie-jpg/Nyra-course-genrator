@@ -1,14 +1,7 @@
-// The Supabase Edge runtime provides Deno and `serve` from the std library at runtime.
-// For local TypeScript checking, silence module resolution and declare a minimal Deno env.
-// @ts-expect-error: Deno std types are available in the Edge runtime
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-// Use `globalThis.Deno` at runtime; avoid declaring Deno to prevent duplicate identifier issues in the workspace TS config.
-
-
-
 // Allow configuration of the origin via a secret `ALLOWED_ORIGIN` (set to a specific origin to restrict CORS; if unset, '*' is used)
-const configuredOrigin = (globalThis as unknown as { Deno?: { env?: { get(name: string): string | undefined } } }).Deno?.env?.get('ALLOWED_ORIGIN') || '*'
+const configuredOrigin = Deno.env.get('ALLOWED_ORIGIN') || '*'
 
 function buildCorsHeaders(origin: string | null) {
   // If a specific origin is configured, only echo that origin when the request origin matches
@@ -45,8 +38,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const deno = (globalThis as unknown as { Deno?: { env?: { get(name: string): string | undefined } } }).Deno
-    const YOUTUBE_API_KEY = deno?.env?.get('YOUTUBE_API_KEY')
+    const YOUTUBE_API_KEY = Deno.env.get('YOUTUBE_API_KEY')
     if (!YOUTUBE_API_KEY) {
       return new Response(JSON.stringify({ error: 'YOUTUBE_API_KEY is not set on the server' }), {
         headers: { ...buildCorsHeaders(reqOrigin), 'Content-Type': 'application/json' },
