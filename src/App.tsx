@@ -8,7 +8,6 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Wizard from "./pages/Wizard";
 import Checkout from "./pages/Checkout";
-import VideoGenerator from "./pages/VideoGenerator";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,7 +24,6 @@ const App = () => (
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/wizard" element={<Wizard />} />
-          <Route path="/video-generator" element={<VideoGenerator />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
