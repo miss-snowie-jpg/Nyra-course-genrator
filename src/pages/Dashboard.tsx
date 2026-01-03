@@ -3,22 +3,33 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Plus, BookOpen, TrendingUp, DollarSign, LogOut, Video } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Sparkles, Plus, BookOpen, TrendingUp, DollarSign, LogOut, Video, CheckCircle, Clock, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
+
+interface Course {
+  id: string;
+  title: string;
+  description: string | null;
+  topic: string;
+  website_status: string | null;
+  created_at: string;
+}
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [courses, setCourses] = useState<Course[]>([]);
 
   useEffect(() => {
-    // Check authentication
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         navigate('/auth');
       } else {
         setUser(session.user);
+        fetchCourses(session.user.id);
       }
       setLoading(false);
     });
@@ -28,11 +39,24 @@ const Dashboard = () => {
         navigate('/auth');
       } else {
         setUser(session.user);
+        fetchCourses(session.user.id);
       }
     });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  const fetchCourses = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('id, title, description, topic, website_status, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setCourses(data);
+    }
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -50,10 +74,13 @@ const Dashboard = () => {
     );
   }
 
+  const paidCourses = courses.filter(c => c.website_status === 'paid');
+  const pendingCourses = courses.filter(c => c.website_status !== 'paid');
+
   const stats = [
-    { icon: BookOpen, label: "Courses Created", value: "0", color: "text-primary" },
-    { icon: TrendingUp, label: "Total Views", value: "0", color: "text-accent" },
-    { icon: DollarSign, label: "Revenue", value: "$0", color: "text-green-500" },
+    { icon: BookOpen, label: "Courses Created", value: courses.length.toString(), color: "text-primary" },
+    { icon: TrendingUp, label: "Published", value: paidCourses.length.toString(), color: "text-accent" },
+    { icon: DollarSign, label: "Revenue", value: `$${paidCourses.length * 40}`, color: "text-green-500" },
   ];
 
   return (
@@ -104,6 +131,52 @@ const Dashboard = () => {
           ))}
         </div>
 
+        {/* My Courses Section */}
+        {courses.length > 0 && (
+          <div className="mb-8">
+            <h2 className="mb-4 text-2xl font-bold">My Courses</h2>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {courses.map((course) => (
+                <Card key={course.id} className="border-border/50 bg-card p-6 hover:shadow-lg transition-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 className="font-semibold text-lg line-clamp-1">{course.title}</h3>
+                    {course.website_status === 'paid' ? (
+                      <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Published
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 border-amber-500/20">
+                        <Clock className="w-3 h-3 mr-1" />
+                        Draft
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                    {course.description || course.topic}
+                  </p>
+                  <div className="flex gap-2">
+                    {course.website_status === 'paid' ? (
+                      <Button size="sm" variant="outline" className="w-full">
+                        <ExternalLink className="w-4 h-4 mr-1" />
+                        View Site
+                      </Button>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        className="w-full bg-gradient-to-r from-primary to-accent"
+                        onClick={() => navigate('/wizard')}
+                      >
+                        Continue Editing
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Create Content CTAs */}
         <div className="grid gap-6 md:grid-cols-2 mb-6">
           <Card className="border-primary/30 bg-gradient-to-br from-primary/10 via-card to-accent/10 p-8 text-center">
@@ -127,29 +200,30 @@ const Dashboard = () => {
           <Card className="border-accent/30 bg-gradient-to-br from-accent/10 via-card to-primary/10 p-8 text-center">
             <div className="mx-auto max-w-xl">
               <Video className="mx-auto mb-4 h-12 w-12 text-accent" />
-              <h2 className="mb-4 text-2xl font-bold">Ad Videos</h2>
+              <h2 className="mb-4 text-2xl font-bold">Generate Video</h2>
               <p className="mb-6 text-muted-foreground">
-                Browse curated ad videos tailored for course sellers.
+                Create AI-powered videos from your images.
               </p>
               <Button 
                 size="lg" 
                 className="w-full bg-gradient-to-r from-accent to-primary"
-                onClick={() => navigate('/ad-videos')}
+                onClick={() => navigate('/video-generator')}
               >
                 <Video className="mr-2 h-5 w-5" />
-                Ad Videos
+                Video Generator
               </Button>
             </div>
           </Card>
         </div>
 
         {/* Trial Notice */}
-        <div className="mt-6 rounded-lg border border-accent/30 bg-accent/5 p-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            🎉 <strong>Free Trial Active</strong> - You have 3 days to create and edit courses. 
-            Publish and monetize after upgrading to a paid plan.
-          </p>
-        </div>
+        {paidCourses.length === 0 && (
+          <div className="mt-6 rounded-lg border border-accent/30 bg-accent/5 p-4 text-center">
+            <p className="text-sm text-muted-foreground">
+              🎉 <strong>Free Trial Active</strong> - Create your first course and publish it for $40.
+            </p>
+          </div>
+        )}
       </main>
     </div>
   );
