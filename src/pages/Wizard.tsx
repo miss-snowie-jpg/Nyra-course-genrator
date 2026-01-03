@@ -62,7 +62,9 @@ const Wizard = () => {
 
   useEffect(() => {
     // If user is coming back from payment, show success even if their session expired.
-    if (searchParams.get('payment') === 'success') {
+    // Handle both "success" and common typo "succes"
+    const paymentParam = searchParams.get('payment');
+    if (paymentParam === 'success' || paymentParam === 'succes') {
       setPaymentSuccess(true);
       toast.success("Payment successful! Your course is now published.");
       return;
