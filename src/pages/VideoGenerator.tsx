@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Play, Video } from "lucide-react";
+import { ArrowLeft, Video, X } from "lucide-react";
 import localVideos from "@/assets/videos";
+import VideoThumbnail from "@/components/VideoThumbnail";
 
 const VideoGenerator = () => {
   const navigate = useNavigate();
+  const videoPlayerRef = useRef<HTMLVideoElement>(null);
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
+  
   const videos = localVideos.map((url, index) => ({
     id: `video-${index + 1}`,
     url,
@@ -15,23 +19,16 @@ const VideoGenerator = () => {
   
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
 
-  const getEmbedUrl = (url: string) => {
-    // YouTube
-    const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
-    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
-    
-    // Vimeo
-    const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
-    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
-    
-    // Direct video URL (mp4, webm, etc.)
-    if (url.match(/\.(mp4|webm|ogg)(\?.*)?$/i)) return url;
-    
-    return url;
-  };
+  const activeVideoData = videos.find(v => v.id === activeVideo);
 
-  const isDirectVideo = (url: string) => {
-    return url.match(/\.(mp4|webm|ogg)(\?.*)?$/i);
+  // Handle video metadata to get aspect ratio
+  const handleVideoLoaded = () => {
+    if (videoPlayerRef.current) {
+      const { videoWidth, videoHeight } = videoPlayerRef.current;
+      if (videoWidth && videoHeight) {
+        setVideoAspectRatio(videoWidth / videoHeight);
+      }
+    }
   };
 
   return (
@@ -55,28 +52,37 @@ const VideoGenerator = () => {
 
       <main className="container mx-auto max-w-6xl px-4 py-8">
         {/* Active Video Player */}
-        {activeVideo && (
+        {activeVideo && activeVideoData && (
           <Card className="mb-8 overflow-hidden border-border/50">
-            <div className="aspect-video bg-black">
-              {isDirectVideo(videos.find(v => v.id === activeVideo)?.url || "") ? (
-                <video
-                  src={getEmbedUrl(videos.find(v => v.id === activeVideo)?.url || "")}
-                  controls
-                  autoPlay
-                  className="w-full h-full"
-                />
-              ) : (
-                <iframe
-                  src={getEmbedUrl(videos.find(v => v.id === activeVideo)?.url || "")}
-                  className="w-full h-full"
-                  allowFullScreen
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                />
-              )}
+            <div 
+              className="relative bg-black flex items-center justify-center"
+              style={{ 
+                maxHeight: '70vh',
+              }}
+            >
+              <video
+                ref={videoPlayerRef}
+                src={activeVideoData.url}
+                controls
+                autoPlay
+                onLoadedMetadata={handleVideoLoaded}
+                className="max-w-full max-h-[70vh] w-auto h-auto"
+                style={{
+                  aspectRatio: videoAspectRatio,
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white"
+                onClick={() => setActiveVideo(null)}
+              >
+                <X className="h-5 w-5" />
+              </Button>
             </div>
             <div className="p-4 bg-card">
               <h3 className="text-lg font-semibold">
-                {videos.find(v => v.id === activeVideo)?.title}
+                {activeVideoData.title}
               </h3>
             </div>
           </Card>
@@ -88,15 +94,17 @@ const VideoGenerator = () => {
             {videos.map((video) => (
               <Card 
                 key={video.id} 
-                className={`overflow-hidden cursor-pointer transition-all hover:shadow-lg ${
+                className={`overflow-hidden cursor-pointer transition-all hover:shadow-lg group ${
                   activeVideo === video.id ? 'ring-2 ring-primary' : ''
                 }`}
                 onClick={() => setActiveVideo(video.id)}
               >
-                <div className="aspect-video bg-muted flex items-center justify-center relative group">
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-                    <Play className="h-12 w-12 text-white opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" />
-                  </div>
+                <div className="aspect-video bg-muted relative">
+                  <VideoThumbnail
+                    videoUrl={video.url}
+                    alt={video.title}
+                    className="w-full h-full"
+                  />
                 </div>
                 <div className="p-4">
                   <h4 className="font-medium truncate">{video.title}</h4>
