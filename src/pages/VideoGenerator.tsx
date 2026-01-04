@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Plus, Play, Trash2, Video, Link as LinkIcon } from "lucide-react";
+import { ArrowLeft, Play, Video } from "lucide-react";
 
 interface VideoItem {
   id: string;
@@ -13,29 +13,12 @@ interface VideoItem {
 
 const VideoGenerator = () => {
   const navigate = useNavigate();
-  const [videos, setVideos] = useState<VideoItem[]>([]);
-  const [newUrl, setNewUrl] = useState("");
-  const [newTitle, setNewTitle] = useState("");
+  // Videos are configured here - URLs are hidden from the UI
+  const videos: VideoItem[] = [
+    // Add your video URLs here
+  ];
+  
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
-
-  const handleAddVideo = () => {
-    if (!newUrl.trim()) return;
-    
-    const video: VideoItem = {
-      id: crypto.randomUUID(),
-      url: newUrl.trim(),
-      title: newTitle.trim() || `Video ${videos.length + 1}`,
-    };
-    
-    setVideos([...videos, video]);
-    setNewUrl("");
-    setNewTitle("");
-  };
-
-  const handleRemoveVideo = (id: string) => {
-    setVideos(videos.filter(v => v.id !== id));
-    if (activeVideo === id) setActiveVideo(null);
-  };
 
   const getEmbedUrl = (url: string) => {
     // YouTube
@@ -76,32 +59,6 @@ const VideoGenerator = () => {
       </header>
 
       <main className="container mx-auto max-w-6xl px-4 py-8">
-        {/* Add Video Form */}
-        <Card className="p-6 mb-8 border-border/50 bg-card/80">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <LinkIcon className="h-5 w-5 text-primary" />
-            Add Video URL
-          </h2>
-          <div className="flex flex-col md:flex-row gap-4">
-            <Input
-              placeholder="Video title (optional)"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              className="md:w-1/3"
-            />
-            <Input
-              placeholder="Paste video URL (YouTube, Vimeo, or direct MP4)"
-              value={newUrl}
-              onChange={(e) => setNewUrl(e.target.value)}
-              className="flex-1"
-            />
-            <Button onClick={handleAddVideo} disabled={!newUrl.trim()}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Video
-            </Button>
-          </div>
-        </Card>
-
         {/* Active Video Player */}
         {activeVideo && (
           <Card className="mb-8 overflow-hidden border-border/50">
@@ -139,28 +96,15 @@ const VideoGenerator = () => {
                 className={`overflow-hidden cursor-pointer transition-all hover:shadow-lg ${
                   activeVideo === video.id ? 'ring-2 ring-primary' : ''
                 }`}
+                onClick={() => setActiveVideo(video.id)}
               >
-                <div 
-                  className="aspect-video bg-muted flex items-center justify-center relative group"
-                  onClick={() => setActiveVideo(video.id)}
-                >
+                <div className="aspect-video bg-muted flex items-center justify-center relative group">
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
                     <Play className="h-12 w-12 text-white opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" />
                   </div>
                 </div>
-                <div className="p-4 flex items-center justify-between">
-                  <h4 className="font-medium truncate flex-1">{video.title}</h4>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-destructive hover:text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveVideo(video.id);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                <div className="p-4">
+                  <h4 className="font-medium truncate">{video.title}</h4>
                 </div>
               </Card>
             ))}
