@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Plus, BookOpen, TrendingUp, DollarSign, LogOut, Video, CheckCircle, Clock, ExternalLink } from "lucide-react";
+import { Sparkles, Plus, BookOpen, TrendingUp, DollarSign, LogOut, Video, CheckCircle, Clock, ExternalLink, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -61,6 +61,23 @@ const Dashboard = () => {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     toast.success("Signed out successfully");
+  };
+
+  const handleDeleteCourse = async (courseId: string, courseTitle: string) => {
+    const confirmed = window.confirm(`Are you sure you want to delete "${courseTitle}"?`);
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from('courses')
+      .delete()
+      .eq('id', courseId);
+
+    if (error) {
+      toast.error("Failed to delete course");
+    } else {
+      setCourses(courses.filter(c => c.id !== courseId));
+      toast.success("Course deleted successfully");
+    }
   };
 
   if (loading) {
@@ -157,19 +174,27 @@ const Dashboard = () => {
                   </p>
                   <div className="flex gap-2">
                     {course.website_status === 'paid' ? (
-                      <Button size="sm" variant="outline" className="w-full">
+                      <Button size="sm" variant="outline" className="flex-1">
                         <ExternalLink className="w-4 h-4 mr-1" />
                         View Site
                       </Button>
                     ) : (
                       <Button 
                         size="sm" 
-                        className="w-full bg-gradient-to-r from-primary to-accent"
+                        className="flex-1 bg-gradient-to-r from-primary to-accent"
                         onClick={() => navigate('/wizard')}
                       >
                         Continue Editing
                       </Button>
                     )}
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                      onClick={() => handleDeleteCourse(course.id, course.title)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </Card>
               ))}
