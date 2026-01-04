@@ -3,11 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, Play, Video } from "lucide-react";
-import { galleryVideos } from "@/constants/GalleryVideos";
+import { video1, video2, video3 } from "@/src/assers/videos"
 
 const VideoGenerator = () => {
   const navigate = useNavigate();
-  const videos = galleryVideos;
+  const videos = [video1, video2, video3];
   
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
 
