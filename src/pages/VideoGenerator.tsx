@@ -1,22 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, Play, Video } from "lucide-react";
-
-interface VideoItem {
-  id: string;
-  url: string;
-  title: string;
-}
+import { galleryVideos } from "@/constants/GalleryVideos";
 
 const VideoGenerator = () => {
   const navigate = useNavigate();
-  // Videos are configured here - URLs are hidden from the UI
-  const videos: VideoItem[] = [
-    // Add your video URLs here
-  ];
+  const videos = galleryVideos;
   
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
 
