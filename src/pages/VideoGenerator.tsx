@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, Play, Video } from "lucide-react";
-import { galleryVideoUrls } from "@/constants/GalleryVideos";
+import galleryVideoUrls from "@/assets/videos";
 
 const VideoGenerator = () => {
   const navigate = useNavigate();
