@@ -20,6 +20,7 @@ interface Course {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { isAdmin } = useAdminRole();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -114,6 +115,12 @@ const Dashboard = () => {
           </div>
           
           <div className="flex items-center gap-3">
+            {isAdmin && (
+              <Button variant="outline" size="sm" onClick={() => navigate('/admin/videos')}>
+                <Settings className="mr-2 h-4 w-4" />
+                Admin
+              </Button>
+            )}
             <ThemeToggle />
             <span className="text-sm text-muted-foreground">{user?.email}</span>
             <Button variant="outline" size="sm" onClick={handleSignOut}>
