@@ -2,22 +2,44 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Video, X } from "lucide-react";
-import localVideos from "@/assets/videos";
+import { ArrowLeft, Video, X, Loader2 } from "lucide-react";
 import VideoThumbnail from "@/components/VideoThumbnail";
+import { supabase } from "@/integrations/supabase/client";
+
+interface GalleryVideo {
+  id: string;
+  url: string;
+  title: string;
+}
 
 const VideoGenerator = () => {
   const navigate = useNavigate();
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
-  
-  const videos = localVideos.map((url, index) => ({
-    id: `video-${index + 1}`,
-    url,
-    title: `Video ${index + 1}`,
-  }));
-  
+  const [videos, setVideos] = useState<GalleryVideo[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchVideos = async () => {
+      const { data, error } = await supabase
+        .from('gallery_videos')
+        .select('id, title, video_url')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (!error && data) {
+        setVideos(data.map(v => ({
+          id: v.id,
+          url: v.video_url,
+          title: v.title,
+        })));
+      }
+      setLoading(false);
+    };
+
+    fetchVideos();
+  }, []);
 
   const activeVideoData = videos.find(v => v.id === activeVideo);
 
@@ -89,7 +111,11 @@ const VideoGenerator = () => {
         )}
 
         {/* Video Grid */}
-        {videos.length > 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : videos.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {videos.map((video) => (
               <Card 
