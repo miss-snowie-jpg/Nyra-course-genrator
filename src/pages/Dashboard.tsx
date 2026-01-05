@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Plus, BookOpen, TrendingUp, DollarSign, LogOut, Video, CheckCircle, Clock, ExternalLink, Trash2 } from "lucide-react";
+import { Sparkles, Plus, BookOpen, TrendingUp, DollarSign, LogOut, Video, CheckCircle, Clock, ExternalLink, Trash2, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
