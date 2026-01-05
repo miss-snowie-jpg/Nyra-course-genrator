@@ -51,11 +51,14 @@ serve(async (req) => {
     console.log("Received webhook payload:", payload);
     console.log("Signature header:", signature);
 
-    // Verify signature
+    // Verify signature - REQUIRED for security
     const isValid = await verifyWebhookSignature(payload, signature, webhookSecret);
-    if (!isValid && signature) {
-      console.warn("Webhook signature verification failed, but continuing for development");
-      // In production, you might want to: throw new Error('Invalid webhook signature');
+    if (!isValid || !signature) {
+      console.error('Webhook signature verification failed - rejecting request');
+      return new Response(
+        JSON.stringify({ error: 'Invalid webhook signature' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const event = JSON.parse(payload);
