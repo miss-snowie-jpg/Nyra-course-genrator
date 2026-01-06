@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, ArrowLeft, ArrowRight, Palette, Type, CheckCircle } from "lucide-react";
+import { Sparkles, ArrowLeft, ArrowRight, Palette, Type, CheckCircle, Lock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { usePaidStatus } from "@/hooks/usePaidStatus";
 
 const COLOR_THEMES = [
   { id: "blue", name: "Ocean Blue", primary: "#3B82F6", secondary: "#1E40AF", accent: "#60A5FA" },
@@ -42,6 +43,7 @@ interface GeneratedCourse {
 const Wizard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { isPaid, loading: paidLoading } = usePaidStatus();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [generatedCourse, setGeneratedCourse] = useState<GeneratedCourse | null>(null);
@@ -84,6 +86,43 @@ const Wizard = () => {
       }
     });
   }, [navigate, searchParams]);
+
+  // Show paywall if not paid (and not returning from payment)
+  if (!paidLoading && !isPaid && searchParams.get('payment') !== 'success' && searchParams.get('payment') !== 'succes') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full p-8 text-center space-y-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mx-auto">
+            <Lock className="w-8 h-8 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold">Premium Feature</h1>
+          <p className="text-muted-foreground">
+            Access to the Course Wizard requires a paid subscription.
+          </p>
+          <div className="space-y-3">
+            <Button 
+              className="w-full bg-gradient-to-r from-primary to-accent"
+              onClick={() => navigate('/checkout?plan=monthly')}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Subscribe Now
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/dashboard')}>
+              Back to Dashboard
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (paidLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const handleNext = () => {
     if (step < 6) {

@@ -2,9 +2,10 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Video, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Video, X, Loader2, Lock, Sparkles } from "lucide-react";
 import VideoThumbnail from "@/components/VideoThumbnail";
 import { supabase } from "@/integrations/supabase/client";
+import { usePaidStatus } from "@/hooks/usePaidStatus";
 
 interface GalleryVideo {
   id: string;
@@ -14,6 +15,7 @@ interface GalleryVideo {
 
 const VideoGenerator = () => {
   const navigate = useNavigate();
+  const { isPaid, loading: paidLoading } = usePaidStatus();
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
   const [videos, setVideos] = useState<GalleryVideo[]>([]);
@@ -40,6 +42,43 @@ const VideoGenerator = () => {
 
     fetchVideos();
   }, []);
+
+  // Show paywall if not paid
+  if (paidLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isPaid) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full p-8 text-center space-y-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mx-auto">
+            <Lock className="w-8 h-8 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold">Premium Feature</h1>
+          <p className="text-muted-foreground">
+            Access to the Video Gallery requires a paid subscription.
+          </p>
+          <div className="space-y-3">
+            <Button 
+              className="w-full bg-gradient-to-r from-primary to-accent"
+              onClick={() => navigate('/checkout?plan=monthly')}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Subscribe Now
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/dashboard')}>
+              Back to Dashboard
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   const activeVideoData = videos.find(v => v.id === activeVideo);
 
