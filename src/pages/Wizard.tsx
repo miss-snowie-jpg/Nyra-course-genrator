@@ -43,7 +43,7 @@ interface GeneratedCourse {
 const Wizard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isPaid, loading: paidLoading } = usePaidStatus();
+  const { isPaid, isAdmin, loading: paidLoading } = usePaidStatus();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [generatedCourse, setGeneratedCourse] = useState<GeneratedCourse | null>(null);
@@ -236,6 +236,20 @@ const Wizard = () => {
         return;
       }
 
+      // Admin users can publish directly without payment
+      if (isAdmin) {
+        const { error } = await supabase
+          .from('courses')
+          .update({ website_status: 'paid' })
+          .eq('id', courseRecordId);
+
+        if (error) throw error;
+        
+        toast.success("Course published successfully!");
+        navigate('/dashboard');
+        return;
+      }
+
       const productId = formData.monetization === 'annual' ? DODO_PRODUCT_ID_ANNUAL : DODO_PRODUCT_ID_MONTHLY;
 
       const { data: { session } } = await supabase.auth.getSession();
@@ -392,7 +406,7 @@ const Wizard = () => {
                   disabled={paymentLoading}
                 >
                   <Sparkles className="mr-2 h-5 w-5" />
-                  {paymentLoading ? "Processing..." : "Publish Course - $40"}
+                  {paymentLoading ? "Processing..." : isAdmin ? "Publish Course" : "Publish Course - $40"}
                 </Button>
                 <Button
                   variant="outline"
