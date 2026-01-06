@@ -69,14 +69,37 @@ Create 4-6 modules with 3-5 lessons each. Be specific and practical.`,
     // Parse the JSON response from the AI
     let course;
     try {
+      // First try direct parsing
       course = JSON.parse(content);
     } catch (e) {
-      // If parsing fails, try to extract JSON from markdown code blocks
-      const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
-      if (jsonMatch) {
-        course = JSON.parse(jsonMatch[1]);
+      console.log("Direct JSON parse failed, attempting extraction...");
+      
+      // Try to extract JSON from various markdown code block formats
+      let jsonString = content;
+      
+      // Try ```json blocks first
+      const jsonCodeBlockMatch = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (jsonCodeBlockMatch) {
+        jsonString = jsonCodeBlockMatch[1].trim();
       } else {
-        throw new Error("Failed to parse course structure");
+        // Try to find JSON object directly (starts with { and ends with })
+        const jsonObjectMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonObjectMatch) {
+          jsonString = jsonObjectMatch[0];
+        }
+      }
+      
+      // Clean up common JSON issues
+      // Remove trailing commas before } or ]
+      jsonString = jsonString.replace(/,\s*([}\]])/g, '$1');
+      // Remove any BOM or invisible characters
+      jsonString = jsonString.replace(/^\uFEFF/, '').trim();
+      
+      try {
+        course = JSON.parse(jsonString);
+      } catch (parseError) {
+        console.error("Failed to parse extracted JSON:", jsonString.substring(0, 500));
+        throw new Error("Failed to parse course structure from AI response");
       }
     }
 
