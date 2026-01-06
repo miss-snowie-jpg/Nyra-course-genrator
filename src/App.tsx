@@ -7,6 +7,7 @@ import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Wizard from "./pages/Wizard";
+import CourseView from "./pages/CourseView";
 import Checkout from "./pages/Checkout";
 import VideoGenerator from "./pages/VideoGenerator";
 import AdminVideos from "./pages/AdminVideos";
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/wizard" element={<Wizard />} />
+          <Route path="/course/:courseId" element={<CourseView />} />
           <Route path="/video-generator" element={<VideoGenerator />} />
           <Route path="/admin/videos" element={<AdminVideos />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

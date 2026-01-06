@@ -182,7 +182,12 @@ const Dashboard = () => {
                   </p>
                   <div className="flex gap-2">
                     {course.website_status === 'paid' ? (
-                      <Button size="sm" variant="outline" className="flex-1">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => navigate(`/course/${course.id}`)}
+                      >
                         <ExternalLink className="w-4 h-4 mr-1" />
                         View Site
                       </Button>
