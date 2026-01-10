@@ -23,11 +23,11 @@ const Checkout = () => {
         return;
       }
       setUserEmail(session.user.email || null);
-      initiateCheckout(session.user.email);
+      initiateCheckout(session.user.email, session.user.id);
     });
   }, [navigate, plan]);
 
-  const initiateCheckout = async (email: string | null | undefined) => {
+  const initiateCheckout = async (email: string | null | undefined, userId: string) => {
     try {
       const productId = plan === 'annual' ? DODO_PRODUCT_ID_ANNUAL : DODO_PRODUCT_ID_MONTHLY;
       const amount = plan === 'annual' ? 399.99 : 40.99;
@@ -40,7 +40,9 @@ const Checkout = () => {
           productId,
           customerEmail: email || 'customer@example.com',
           courseName: planName,
-          successUrl: `${window.location.origin}/wizard?payment=success&plan=${plan}`,
+          userId: userId,
+          plan: plan,
+          successUrl: `${window.location.origin}/dashboard?payment=success&plan=${plan}`,
         },
       });
 

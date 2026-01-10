@@ -19,7 +19,7 @@ serve(async (req) => {
   }
 
   try {
-    const { amount, currency, courseId, courseName, productId, customerEmail, successUrl } =
+    const { amount, currency, courseId, courseName, productId, customerEmail, successUrl, userId, plan } =
       await req.json();
 
     console.log("Creating Dodo checkout session:", {
@@ -28,6 +28,8 @@ serve(async (req) => {
       courseId,
       courseName,
       productId,
+      userId,
+      plan,
     });
 
     const apiKey = Deno.env.get("DODO_API_KEY");
@@ -69,6 +71,8 @@ serve(async (req) => {
       metadata: {
         course_id: courseId,
         course_name: courseName,
+        user_id: userId,
+        plan: plan,
       },
     };
 

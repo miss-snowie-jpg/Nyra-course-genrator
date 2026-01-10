@@ -18,13 +18,13 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
 
   const getRedirectUrl = () => {
+    // Always redirect to pricing page after auth (users must choose a plan)
+    // Plan param is used if user came from landing page with a specific plan
     if (plan && plan !== 'free') {
       return `/checkout?plan=${plan}`;
     }
-    if (plan === 'free') {
-      return `/wizard?plan=${plan}`;
-    }
-    return '/dashboard';
+    // Default: redirect to pricing page to choose a plan
+    return '/pricing';
   };
 
   useEffect(() => {

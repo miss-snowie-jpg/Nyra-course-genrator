@@ -77,11 +77,45 @@ serve(async (req) => {
       case 'payment_intent.succeeded':
         console.log("Payment succeeded:", event.data);
         
-        // Extract course ID from metadata
-        const courseId = event.data?.metadata?.course_id || event.data?.object?.metadata?.course_id;
+        // Extract metadata
+        const metadata = event.data?.metadata || event.data?.object?.metadata || {};
+        const courseId = metadata.course_id;
+        const userId = metadata.user_id;
+        const plan = metadata.plan; // 'monthly' or 'annual'
         
+        // Create or update subscription if plan info is present
+        if (userId && plan) {
+          const subscriptionPlan = plan === 'annual' ? 'yearly' : 'monthly';
+          const expiresAt = new Date();
+          
+          if (subscriptionPlan === 'yearly') {
+            expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+          } else {
+            expiresAt.setMonth(expiresAt.getMonth() + 1);
+          }
+          
+          // Upsert subscription
+          const { error: subError } = await supabase
+            .from('subscriptions')
+            .upsert({
+              user_id: userId,
+              plan: subscriptionPlan,
+              status: 'active',
+              started_at: new Date().toISOString(),
+              expires_at: expiresAt.toISOString(),
+            }, {
+              onConflict: 'user_id'
+            });
+          
+          if (subError) {
+            console.error("Error creating subscription:", subError);
+          } else {
+            console.log("Subscription created/updated for user:", userId, "plan:", subscriptionPlan);
+          }
+        }
+        
+        // Update course status if course ID present
         if (courseId) {
-          // Update course status or create payment record
           const { error } = await supabase
             .from('courses')
             .update({ website_status: 'paid' })

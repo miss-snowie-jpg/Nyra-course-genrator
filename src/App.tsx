@@ -9,6 +9,8 @@ import Dashboard from "./pages/Dashboard";
 import Wizard from "./pages/Wizard";
 import CourseView from "./pages/CourseView";
 import Checkout from "./pages/Checkout";
+import Pricing from "./pages/Pricing";
+import AutoPoster from "./pages/AutoPoster";
 import VideoGenerator from "./pages/VideoGenerator";
 import AdminVideos from "./pages/AdminVideos";
 import NotFound from "./pages/NotFound";
@@ -25,10 +27,12 @@ const App = () => (
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/checkout" element={<Checkout />} />
+          <Route path="/pricing" element={<Pricing />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/wizard" element={<Wizard />} />
           <Route path="/course/:courseId" element={<CourseView />} />
           <Route path="/video-generator" element={<VideoGenerator />} />
+          <Route path="/auto-poster" element={<AutoPoster />} />
           <Route path="/admin/videos" element={<AdminVideos />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdminRole } from "@/hooks/useAdminRole";
+import { useSubscription } from "@/hooks/useSubscription";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Plus, BookOpen, TrendingUp, DollarSign, LogOut, Video, CheckCircle, Clock, ExternalLink, Trash2, Settings } from "lucide-react";
+import { Sparkles, Plus, BookOpen, TrendingUp, DollarSign, LogOut, Video, CheckCircle, Clock, ExternalLink, Trash2, Settings, Share2, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -21,31 +22,57 @@ interface Course {
 const Dashboard = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAdminRole();
+  const { subscription, hasSubscription, hasAutoPoster, loading: subscriptionLoading } = useSubscription();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState<Course[]>([]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkAuthAndSubscription = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
       if (!session) {
         navigate('/auth');
-      } else {
-        setUser(session.user);
-        fetchCourses(session.user.id);
+        return;
       }
+      
+      setUser(session.user);
+      
+      // Check if user is admin
+      const { data: adminData } = await supabase.rpc('has_role', {
+        _user_id: session.user.id,
+        _role: 'admin'
+      });
+      
+      if (!adminData) {
+        // Check for active subscription
+        const { data: sub } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .eq('status', 'active')
+          .single();
+        
+        if (!sub) {
+          // No subscription, redirect to pricing
+          navigate('/pricing');
+          return;
+        }
+      }
+      
+      fetchCourses(session.user.id);
       setLoading(false);
-    });
+    };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    checkAuthAndSubscription();
+
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
         navigate('/auth');
-      } else {
-        setUser(session.user);
-        fetchCourses(session.user.id);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => authSub.unsubscribe();
   }, [navigate]);
 
   const fetchCourses = async (userId: string) => {
@@ -216,7 +243,7 @@ const Dashboard = () => {
         )}
 
         {/* Create Content CTAs */}
-        <div className="grid gap-6 md:grid-cols-2 mb-6">
+        <div className={`grid gap-6 ${hasAutoPoster ? 'md:grid-cols-3' : 'md:grid-cols-2'} mb-6`}>
           <Card className="border-primary/30 bg-gradient-to-br from-primary/10 via-card to-accent/10 p-8 text-center">
             <div className="mx-auto max-w-xl">
               <Sparkles className="mx-auto mb-4 h-12 w-12 text-primary" />
@@ -252,13 +279,42 @@ const Dashboard = () => {
               </Button>
             </div>
           </Card>
+
+          {/* Auto Poster Card - Only for yearly subscribers */}
+          {hasAutoPoster && (
+            <Card className="border-yellow-500/30 bg-gradient-to-br from-yellow-500/10 via-card to-orange-500/10 p-8 text-center relative overflow-hidden">
+              <Badge className="absolute top-4 right-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
+                <Crown className="mr-1 h-3 w-3" />
+                Yearly
+              </Badge>
+              <div className="mx-auto max-w-xl">
+                <Share2 className="mx-auto mb-4 h-12 w-12 text-yellow-500" />
+                <h2 className="mb-4 text-2xl font-bold">Auto Poster</h2>
+                <p className="mb-6 text-muted-foreground">
+                  Automatically post ads from our library to your social media.
+                </p>
+                <Button 
+                  size="lg" 
+                  className="w-full bg-gradient-to-r from-yellow-500 to-orange-500"
+                  onClick={() => navigate('/auto-poster')}
+                >
+                  <Share2 className="mr-2 h-5 w-5" />
+                  Manage Auto Poster
+                </Button>
+              </div>
+            </Card>
+          )}
         </div>
 
-        {/* Trial Notice */}
-        {paidCourses.length === 0 && (
-          <div className="mt-6 rounded-lg border border-accent/30 bg-accent/5 p-4 text-center">
+        {/* Subscription Badge */}
+        {subscription && (
+          <div className="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-4 text-center">
             <p className="text-sm text-muted-foreground">
-              🎉 <strong>Free Trial Active</strong> - Create your first course and publish it for $40.
+              {subscription.plan === 'yearly' ? (
+                <>🌟 <strong>Yearly Subscriber</strong> - You have access to all premium features including Auto Poster!</>
+              ) : (
+                <>✨ <strong>Monthly Subscriber</strong> - Upgrade to yearly to unlock Auto Poster and save $91.89/year!</>
+              )}
             </p>
           </div>
         )}

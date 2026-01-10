@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      auto_poster_jobs: {
+        Row: {
+          access_token: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          last_posted_at: string | null
+          next_post_at: string | null
+          platform: string
+          schedule_type: string
+          updated_at: string
+          user_id: string
+          video_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_posted_at?: string | null
+          next_post_at?: string | null
+          platform: string
+          schedule_type?: string
+          updated_at?: string
+          user_id: string
+          video_id: string
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_posted_at?: string | null
+          next_post_at?: string | null
+          platform?: string
+          schedule_type?: string
+          updated_at?: string
+          user_id?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_poster_jobs_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       courses: {
         Row: {
           audience: string
@@ -107,6 +157,39 @@ export type Database = {
           title?: string
           updated_at?: string
           video_url?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          plan: string
+          started_at: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan?: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
