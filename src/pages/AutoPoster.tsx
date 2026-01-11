@@ -9,10 +9,11 @@ import { Switch } from "@/components/ui/switch";
 import { 
   Sparkles, ArrowLeft, Plus, Trash2, Play, Pause, 
   Instagram, Youtube, Facebook, Twitter, Clock,
-  Share2, Crown
+  Share2, Crown, Link2
 } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import SocialAccountsManager from "@/components/SocialAccountsManager";
 
 interface GalleryVideo {
   id: string;
@@ -38,6 +39,7 @@ const platformIcons: Record<string, any> = {
   facebook: Facebook,
   twitter: Twitter,
   tiktok: Share2,
+  linktree: Link2,
 };
 
 const platformColors: Record<string, string> = {
@@ -46,6 +48,7 @@ const platformColors: Record<string, string> = {
   facebook: "text-blue-500",
   twitter: "text-sky-500",
   tiktok: "text-foreground",
+  linktree: "text-green-500",
 };
 
 const AutoPoster = () => {
@@ -276,13 +279,16 @@ const AutoPoster = () => {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Auto Poster</h1>
-            <p className="text-muted-foreground">Automatically post ads to your social media</p>
+            <p className="text-muted-foreground">Automatically post ads to your social media accounts</p>
           </div>
           <Button onClick={() => setShowAddForm(!showAddForm)}>
             <Plus className="mr-2 h-4 w-4" />
             Create Job
           </Button>
         </div>
+
+        {/* Social Accounts Manager */}
+        <SocialAccountsManager />
 
         {/* Add New Job Form */}
         {showAddForm && (
@@ -316,6 +322,7 @@ const AutoPoster = () => {
                     <SelectItem value="youtube">YouTube</SelectItem>
                     <SelectItem value="facebook">Facebook</SelectItem>
                     <SelectItem value="twitter">Twitter/X</SelectItem>
+                    <SelectItem value="linktree">Linktree</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
