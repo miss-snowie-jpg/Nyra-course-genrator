@@ -35,18 +35,24 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are an expert course curriculum designer. Create comprehensive, well-structured courses that are engaging and educational. Return courses in JSON format with the following structure:
+            content: `You are an expert course curriculum designer. Create comprehensive, well-structured courses with full lesson content that are engaging and educational. Return courses in JSON format with the following structure:
 {
   "title": "Course Title",
   "description": "Brief course description (2-3 sentences)",
   "modules": [
     {
       "title": "Module Title",
-      "lessons": ["Lesson 1", "Lesson 2", "Lesson 3"]
+      "lessons": [
+        {
+          "title": "Lesson Title",
+          "content": "Full lesson content with detailed explanations, examples, and key takeaways. Use markdown formatting for headers (##), bullet points (-), bold (**text**), and code blocks if relevant. Content should be 300-500 words per lesson.",
+          "keyPoints": ["Key point 1", "Key point 2", "Key point 3"]
+        }
+      ]
     }
   ]
 }
-Create 4-6 modules with 3-5 lessons each. Be specific and practical.`,
+Create 4-6 modules with 3-5 lessons each. Each lesson must have substantial educational content. Be specific, practical, and include real-world examples.`,
           },
           {
             role: "user",
