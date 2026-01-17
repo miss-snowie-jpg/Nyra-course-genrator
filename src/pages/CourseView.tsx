@@ -111,15 +111,23 @@ const CourseView = () => {
   };
 
   // Helper to get lesson data (handles both old string format and new object format)
-  const getLessonData = (lesson: Lesson | string): { title: string; content: string; keyPoints: string[] } => {
+  const getLessonData = (lesson: Lesson | string | unknown): { title: string; content: string; keyPoints: string[] } => {
     if (typeof lesson === 'string') {
       return { title: lesson, content: '', keyPoints: [] };
     }
-    return { 
-      title: lesson.title, 
-      content: lesson.content || '', 
-      keyPoints: lesson.keyPoints || [] 
-    };
+    if (typeof lesson === 'object' && lesson !== null) {
+      const obj = lesson as Record<string, unknown>;
+      const title = typeof obj.title === 'string' ? obj.title : 'Untitled Lesson';
+      const content = typeof obj.content === 'string' ? obj.content : '';
+      let keyPoints: string[] = [];
+      if (Array.isArray(obj.keyPoints)) {
+        keyPoints = obj.keyPoints.map((p: unknown) => 
+          typeof p === 'string' ? p : (typeof p === 'object' && p !== null ? JSON.stringify(p) : String(p))
+        );
+      }
+      return { title, content, keyPoints };
+    }
+    return { title: 'Untitled Lesson', content: '', keyPoints: [] };
   };
 
   if (loading) {
