@@ -29,9 +29,28 @@ const FONT_STYLES = [
   { id: "bold", name: "Bold Impact", heading: "Montserrat", body: "Open Sans", preview: "Strong and impactful" },
 ];
 
+interface QuizQuestion {
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+interface ModuleQuiz {
+  title: string;
+  questions: QuizQuestion[];
+}
+
+interface CourseLesson {
+  title: string;
+  content: string;
+  keyPoints: string[];
+}
+
 interface CourseModule {
   title: string;
-  lessons: string[];
+  lessons: CourseLesson[];
+  quiz?: ModuleQuiz;
 }
 
 interface GeneratedCourse {
@@ -371,27 +390,63 @@ const Wizard = () => {
                 <p className="text-muted-foreground">Review your AI-generated course structure below</p>
               </div>
 
-              <div className="space-y-6 bg-gradient-to-br from-primary/5 to-accent/5 rounded-lg p-6">
-                <div>
-                  <h3 className="text-2xl font-bold mb-2">{generatedCourse.title}</h3>
-                  <p className="text-muted-foreground">{generatedCourse.description}</p>
+              {/* Website Color Preview */}
+              {selectedColorTheme && (
+                <div 
+                  className="rounded-xl border-2 overflow-hidden"
+                  style={{ borderColor: selectedColorTheme.primary }}
+                >
+                  <div 
+                    className="p-4 text-white"
+                    style={{ background: `linear-gradient(135deg, ${selectedColorTheme.primary}, ${selectedColorTheme.secondary})` }}
+                  >
+                    <h4 className="font-bold text-lg">Your Course Website Preview</h4>
+                    <p className="text-sm opacity-90">Using {selectedColorTheme.name} theme</p>
+                  </div>
+                  <div className="p-6 bg-card">
+                    <h3 className="text-2xl font-bold mb-2" style={{ color: selectedColorTheme.primary }}>
+                      {generatedCourse.title}
+                    </h3>
+                    <p className="text-muted-foreground mb-4">{generatedCourse.description}</p>
+                    <button 
+                      className="px-6 py-2 rounded-lg text-white font-medium"
+                      style={{ backgroundColor: selectedColorTheme.primary }}
+                    >
+                      Start Learning
+                    </button>
+                  </div>
                 </div>
+              )}
 
+              <div className="space-y-6 bg-gradient-to-br from-primary/5 to-accent/5 rounded-lg p-6">
                 <div className="space-y-4">
-                  <h4 className="text-xl font-semibold">Course Modules</h4>
+                  <h4 className="text-xl font-semibold">Course Modules & Quizzes</h4>
                   {generatedCourse.modules.map((module, idx) => (
                     <Card key={idx} className="p-6 bg-card hover:shadow-md transition-shadow">
                       <h5 className="font-semibold text-lg mb-3 text-primary">
                         Module {idx + 1}: {module.title}
                       </h5>
-                      <ul className="space-y-2">
+                      <ul className="space-y-2 mb-4">
                         {module.lessons.map((lesson, lessonIdx) => (
                           <li key={lessonIdx} className="flex items-start gap-2 text-sm">
                             <span className="text-accent mt-1">•</span>
-                            <span>{lesson}</span>
+                            <span>{typeof lesson === 'string' ? lesson : lesson.title}</span>
                           </li>
                         ))}
                       </ul>
+                      
+                      {/* Quiz Preview */}
+                      {module.quiz && module.quiz.questions && module.quiz.questions.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-border/50">
+                          <div className="flex items-center gap-2 text-sm font-medium text-accent mb-2">
+                            <CheckCircle className="h-4 w-4" />
+                            Module Quiz: {module.quiz.questions.length} questions
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Students will take a quiz at the end of this module to test their understanding.
+                          </p>
+                        </div>
+                      )}
                     </Card>
                   ))}
                 </div>
