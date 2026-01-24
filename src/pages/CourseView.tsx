@@ -2,9 +2,25 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Sparkles, ArrowLeft, BookOpen, GraduationCap, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Sparkles, ArrowLeft, BookOpen, GraduationCap, ChevronRight, CheckCircle2, HelpCircle, Trophy } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+
+interface QuizQuestion {
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+interface ModuleQuiz {
+  title: string;
+  questions: QuizQuestion[];
+}
 
 interface Lesson {
   title: string;
@@ -15,6 +31,7 @@ interface Lesson {
 interface Module {
   title: string;
   lessons: Lesson[] | string[];
+  quiz?: ModuleQuiz;
 }
 
 interface Course {
@@ -35,7 +52,10 @@ const CourseView = () => {
   const [activeModule, setActiveModule] = useState(0);
   const [activeLesson, setActiveLesson] = useState(0);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
-
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [completedQuizzes, setCompletedQuizzes] = useState<Set<number>>(new Set());
   useEffect(() => {
     const fetchCourse = async () => {
       if (!courseId) {
@@ -89,18 +109,43 @@ const CourseView = () => {
     completedLessons.has(getLessonKey(moduleIndex, lessonIndex));
 
   const goToNextLesson = () => {
+    if (showQuiz) {
+      // Move to next module after quiz
+      if (activeModule < (course?.modules.length || 0) - 1) {
+        setActiveModule(activeModule + 1);
+        setActiveLesson(0);
+        setShowQuiz(false);
+        setQuizAnswers({});
+        setQuizSubmitted(false);
+      }
+      return;
+    }
+
     const currentModule = course?.modules[activeModule];
     if (!currentModule) return;
 
     if (activeLesson < currentModule.lessons.length - 1) {
       setActiveLesson(activeLesson + 1);
-    } else if (activeModule < (course?.modules.length || 0) - 1) {
-      setActiveModule(activeModule + 1);
-      setActiveLesson(0);
+    } else {
+      // Last lesson - check if there's a quiz
+      if (currentModule.quiz && currentModule.quiz.questions && currentModule.quiz.questions.length > 0) {
+        setShowQuiz(true);
+        setQuizAnswers({});
+        setQuizSubmitted(false);
+      } else if (activeModule < (course?.modules.length || 0) - 1) {
+        setActiveModule(activeModule + 1);
+        setActiveLesson(0);
+      }
     }
   };
 
   const goToPreviousLesson = () => {
+    if (showQuiz) {
+      // Go back to last lesson
+      setShowQuiz(false);
+      return;
+    }
+
     if (activeLesson > 0) {
       setActiveLesson(activeLesson - 1);
     } else if (activeModule > 0) {
@@ -108,6 +153,36 @@ const CourseView = () => {
       setActiveModule(activeModule - 1);
       setActiveLesson((prevModule?.lessons.length || 1) - 1);
     }
+  };
+
+  const handleQuizAnswer = (questionIndex: number, answerIndex: number) => {
+    if (!quizSubmitted) {
+      setQuizAnswers(prev => ({ ...prev, [questionIndex]: answerIndex }));
+    }
+  };
+
+  const submitQuiz = () => {
+    const currentModule = course?.modules[activeModule];
+    if (!currentModule?.quiz) return;
+
+    const totalQuestions = currentModule.quiz.questions.length;
+    const correctAnswers = currentModule.quiz.questions.filter(
+      (q, idx) => quizAnswers[idx] === q.correctIndex
+    ).length;
+
+    setQuizSubmitted(true);
+    
+    if (correctAnswers >= totalQuestions * 0.7) {
+      setCompletedQuizzes(prev => new Set([...prev, activeModule]));
+      toast.success(`Congratulations! You scored ${correctAnswers}/${totalQuestions} (${Math.round(correctAnswers/totalQuestions*100)}%)`);
+    } else {
+      toast.error(`You scored ${correctAnswers}/${totalQuestions}. Try again to pass!`);
+    }
+  };
+
+  const retakeQuiz = () => {
+    setQuizAnswers({});
+    setQuizSubmitted(false);
   };
 
   // Helper to get lesson data (handles both old string format and new object format)
@@ -145,7 +220,8 @@ const CourseView = () => {
     return null;
   }
 
-  const currentModuleLessons = course.modules[activeModule]?.lessons || [];
+  const currentModule = course.modules[activeModule];
+  const currentModuleLessons = currentModule?.lessons || [];
   const currentLesson = currentModuleLessons[activeLesson];
   const lessonData = currentLesson ? getLessonData(currentLesson) : null;
   const hasContent = lessonData && lessonData.content;
@@ -287,11 +363,142 @@ const CourseView = () => {
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
                 <span>Module {activeModule + 1}</span>
                 <ChevronRight className="h-4 w-4" />
-                <span>Lesson {activeLesson + 1}</span>
+                {showQuiz ? (
+                  <span>Module Quiz</span>
+                ) : (
+                  <span>Lesson {activeLesson + 1}</span>
+                )}
               </div>
 
-              {/* Lesson Content */}
-              {lessonData && (
+              {/* Quiz View */}
+              {showQuiz && currentModule?.quiz ? (
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4">
+                      <HelpCircle className="w-8 h-8 text-white" />
+                    </div>
+                    <h1 className="text-3xl font-bold mb-2">{currentModule.quiz.title || 'Module Quiz'}</h1>
+                    <p className="text-muted-foreground">
+                      Test your knowledge from {currentModule.title}
+                    </p>
+                  </div>
+
+                  {quizSubmitted && (
+                    <Card className={`p-6 ${
+                      Object.keys(quizAnswers).length === currentModule.quiz.questions.length &&
+                      currentModule.quiz.questions.filter((q, idx) => quizAnswers[idx] === q.correctIndex).length >= 
+                      currentModule.quiz.questions.length * 0.7
+                        ? 'bg-green-500/10 border-green-500/30'
+                        : 'bg-destructive/10 border-destructive/30'
+                    }`}>
+                      <div className="flex items-center gap-4">
+                        <Trophy className={`h-8 w-8 ${
+                          currentModule.quiz.questions.filter((q, idx) => quizAnswers[idx] === q.correctIndex).length >= 
+                          currentModule.quiz.questions.length * 0.7
+                            ? 'text-green-500'
+                            : 'text-destructive'
+                        }`} />
+                        <div>
+                          <h3 className="font-semibold text-lg">
+                            Score: {currentModule.quiz.questions.filter((q, idx) => quizAnswers[idx] === q.correctIndex).length} / {currentModule.quiz.questions.length}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            {currentModule.quiz.questions.filter((q, idx) => quizAnswers[idx] === q.correctIndex).length >= 
+                              currentModule.quiz.questions.length * 0.7
+                                ? 'Great job! You passed this quiz.'
+                                : 'You need 70% to pass. Review the material and try again.'}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+
+                  <div className="space-y-6">
+                    {currentModule.quiz.questions.map((question, qIndex) => {
+                      const isCorrect = quizSubmitted && quizAnswers[qIndex] === question.correctIndex;
+                      const isWrong = quizSubmitted && quizAnswers[qIndex] !== undefined && quizAnswers[qIndex] !== question.correctIndex;
+                      
+                      return (
+                        <Card key={qIndex} className={`p-6 ${
+                          isCorrect ? 'border-green-500/50 bg-green-500/5' :
+                          isWrong ? 'border-destructive/50 bg-destructive/5' : ''
+                        }`}>
+                          <h4 className="font-medium text-lg mb-4">
+                            {qIndex + 1}. {question.question}
+                          </h4>
+                          <RadioGroup
+                            value={quizAnswers[qIndex]?.toString()}
+                            onValueChange={(value) => handleQuizAnswer(qIndex, parseInt(value))}
+                            disabled={quizSubmitted}
+                          >
+                            {question.options.map((option, oIndex) => {
+                              const isThisCorrect = quizSubmitted && oIndex === question.correctIndex;
+                              const isThisSelected = quizAnswers[qIndex] === oIndex;
+                              
+                              return (
+                                <div key={oIndex} className={`flex items-center space-x-3 p-3 rounded-lg transition-all ${
+                                  isThisCorrect ? 'bg-green-500/20' :
+                                  isThisSelected && isWrong ? 'bg-destructive/20' :
+                                  isThisSelected ? 'bg-primary/10' : 'hover:bg-muted/50'
+                                }`}>
+                                  <RadioGroupItem value={oIndex.toString()} id={`q${qIndex}-o${oIndex}`} />
+                                  <Label 
+                                    htmlFor={`q${qIndex}-o${oIndex}`} 
+                                    className="flex-1 cursor-pointer"
+                                  >
+                                    {option}
+                                  </Label>
+                                  {isThisCorrect && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+                                </div>
+                              );
+                            })}
+                          </RadioGroup>
+                          
+                          {quizSubmitted && question.explanation && (
+                            <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                              <p className="text-sm">
+                                <span className="font-medium">Explanation:</span> {question.explanation}
+                              </p>
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border/50">
+                    <Button variant="outline" onClick={goToPreviousLesson}>
+                      Back to Lessons
+                    </Button>
+                    
+                    <div className="flex gap-2">
+                      {quizSubmitted ? (
+                        <>
+                          <Button variant="outline" onClick={retakeQuiz}>
+                            Retake Quiz
+                          </Button>
+                          {activeModule < course.modules.length - 1 && (
+                            <Button 
+                              onClick={goToNextLesson}
+                              className="bg-gradient-to-r from-primary to-accent"
+                            >
+                              Next Module
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <Button 
+                          onClick={submitQuiz}
+                          disabled={Object.keys(quizAnswers).length !== currentModule.quiz.questions.length}
+                          className="bg-gradient-to-r from-primary to-accent"
+                        >
+                          Submit Quiz
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : lessonData && (
                 <div className="space-y-6">
                   <div>
                     <h1 className="text-3xl font-bold mb-2">{lessonData.title}</h1>
@@ -377,13 +584,11 @@ const CourseView = () => {
                       </Button>
                       <Button
                         onClick={goToNextLesson}
-                        disabled={
-                          activeModule === course.modules.length - 1 && 
-                          activeLesson === currentModuleLessons.length - 1
-                        }
                         className="flex-1 sm:flex-none bg-gradient-to-r from-primary to-accent"
                       >
-                        Next Lesson
+                        {activeLesson === currentModuleLessons.length - 1 && currentModule?.quiz?.questions?.length 
+                          ? 'Take Quiz' 
+                          : 'Next Lesson'}
                       </Button>
                     </div>
                   </div>
