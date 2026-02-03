@@ -5,13 +5,31 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const LANGUAGE_INSTRUCTIONS: Record<string, string> = {
+  english: "Write all content in English. Use clear, concise language accessible to ESL learners.",
+  amharic: "Write all content in Amharic (አማርኛ). Use culturally relevant Ethiopian idioms and metaphors. Ensure the language is accessible and encouraging.",
+  swahili: "Write all content in Kiswahili. Use East African expressions, proverbs (methali), and culturally relevant examples.",
+  french: "Write all content in French. Use African Francophone expressions and examples relevant to West and Central Africa.",
+};
+
+const AFRICAN_CONTEXT = `
+IMPORTANT CONTEXT - Use African Success Stories and Examples:
+- When giving business examples, reference African success stories like M-Pesa (Kenya's mobile money revolution), Dangote Group (Africa's largest industrial conglomerate), Ethiopian Airlines (Africa's leading airline), Jumia (Africa's e-commerce pioneer), Flutterwave (Pan-African fintech), or Andela (tech talent accelerator).
+- Reference local innovators and entrepreneurs when relevant.
+- Align content with AU Agenda 2063 vision of "The Africa We Want" - emphasizing sustainable development, technological advancement, and inclusive growth.
+- Use culturally relevant metaphors and examples that resonate with African learners.
+- Be encouraging, professional, and visionary in tone.
+- Keep explanations concise and clear to accommodate ESL learners.
+- Include practical, actionable steps that can be applied in African contexts.
+`;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { topic } = await req.json();
+    const { topic, language = "english" } = await req.json();
     
     if (!topic) {
       throw new Error("Topic is required");
@@ -22,7 +40,9 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Generating course for topic:", topic);
+    console.log("Generating course for topic:", topic, "in language:", language);
+
+    const languageInstruction = LANGUAGE_INSTRUCTIONS[language] || LANGUAGE_INSTRUCTIONS.english;
 
     // Use AbortController for timeout handling
     const controller = new AbortController();
@@ -41,7 +61,13 @@ serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: `You are an expert course curriculum designer. Create comprehensive, well-structured courses with full lesson content and quizzes. Return courses in JSON format with the following structure:
+              content: `You are an expert course curriculum designer creating courses for African learners. 
+
+${AFRICAN_CONTEXT}
+
+${languageInstruction}
+
+Create comprehensive, well-structured courses with full lesson content and quizzes. Return courses in JSON format with the following structure:
 {
   "title": "Course Title",
   "description": "Brief course description (2-3 sentences)",
@@ -51,7 +77,7 @@ serve(async (req) => {
       "lessons": [
         {
           "title": "Lesson Title",
-          "content": "Full lesson content with detailed explanations, examples, and key takeaways. Use markdown formatting for headers (##), bullet points (-), bold (**text**), and code blocks if relevant. Content should be 200-300 words per lesson.",
+          "content": "Full lesson content with detailed explanations, examples, and key takeaways. Use markdown formatting for headers (##), bullet points (-), bold (**text**), and code blocks if relevant. Content should be 200-300 words per lesson. Include African examples and success stories where relevant.",
           "keyPoints": ["Key point 1", "Key point 2", "Key point 3"]
         }
       ],
@@ -69,7 +95,7 @@ serve(async (req) => {
     }
   ]
 }
-Create 3-4 modules with 2-3 lessons each. Each module must have a quiz with 3-4 questions to test student understanding. Be specific, practical, and include real-world examples.`,
+Create 3-4 modules with 2-3 lessons each. Each module must have a quiz with 3-4 questions to test student understanding. Be specific, practical, and include real-world African examples.`,
             },
             {
               role: "user",

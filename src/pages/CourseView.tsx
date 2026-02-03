@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sparkles, ArrowLeft, BookOpen, GraduationCap, ChevronRight, CheckCircle2, HelpCircle, Trophy } from "lucide-react";
+import { Sparkles, ArrowLeft, BookOpen, GraduationCap, ChevronRight, CheckCircle2, HelpCircle, Trophy, Wifi, WifiOff } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface QuizQuestion {
   question: string;
@@ -56,6 +57,33 @@ const CourseView = () => {
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [completedQuizzes, setCompletedQuizzes] = useState<Set<number>>(new Set());
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSlowConnection, setIsSlowConnection] = useState(false);
+
+  // Monitor network status for low bandwidth optimization
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Check for slow connection
+    const connection = (navigator as any).connection;
+    if (connection) {
+      const checkConnection = () => {
+        const effectiveType = connection.effectiveType;
+        setIsSlowConnection(effectiveType === '2g' || effectiveType === 'slow-2g');
+      };
+      checkConnection();
+      connection.addEventListener('change', checkConnection);
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
   useEffect(() => {
     const fetchCourse = async () => {
       if (!courseId) {
@@ -232,30 +260,49 @@ const CourseView = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Network Status Banner - shows on slow/offline connections */}
+      {(!isOnline || isSlowConnection) && (
+        <div className={`py-2 px-4 text-center text-sm flex items-center justify-center gap-2 ${
+          !isOnline ? 'bg-destructive/10 text-destructive' : 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-300'
+        }`}>
+          {!isOnline ? (
+            <>
+              <WifiOff className="h-4 w-4" />
+              <span>You're offline. Content will load when connection is restored.</span>
+            </>
+          ) : (
+            <>
+              <Wifi className="h-4 w-4" />
+              <span>Slow connection detected. Content optimized for low bandwidth.</span>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-4">
+        <div className="container mx-auto flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Back</span>
             </Button>
-            <div className="flex items-center gap-2 text-xl font-bold">
+            <div className="flex items-center gap-2 text-lg font-bold">
               <GraduationCap className="h-5 w-5 text-primary" />
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent hidden sm:inline">
+              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent hidden sm:inline truncate max-w-[200px]">
                 {course.title}
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
-              <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="w-20 sm:w-32 h-2 bg-muted rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-300"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
-              <span>{progressPercent}%</span>
+              <span className="text-xs">{progressPercent}%</span>
             </div>
             <ThemeToggle />
           </div>
