@@ -7,10 +7,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, ArrowLeft, ArrowRight, Palette, Type, CheckCircle, Lock, Loader2 } from "lucide-react";
+import { Sparkles, ArrowLeft, ArrowRight, Palette, Type, CheckCircle, Lock, Loader2, Globe, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { usePaidStatus } from "@/hooks/usePaidStatus";
+
+const LANGUAGES = [
+  { id: "english", name: "English", flag: "🇬🇧", native: "English" },
+  { id: "amharic", name: "Amharic", flag: "🇪🇹", native: "አማርኛ" },
+  { id: "swahili", name: "Swahili", flag: "🇰🇪", native: "Kiswahili" },
+  { id: "french", name: "French", flag: "🇫🇷", native: "Français" },
+];
 
 const COLOR_THEMES = [
   { id: "blue", name: "Ocean Blue", primary: "#3B82F6", secondary: "#1E40AF", accent: "#60A5FA" },
@@ -19,6 +26,8 @@ const COLOR_THEMES = [
   { id: "orange", name: "Sunset Orange", primary: "#F97316", secondary: "#C2410C", accent: "#FB923C" },
   { id: "pink", name: "Rose Pink", primary: "#EC4899", secondary: "#BE185D", accent: "#F472B6" },
   { id: "teal", name: "Modern Teal", primary: "#14B8A6", secondary: "#0D9488", accent: "#2DD4BF" },
+  { id: "gold", name: "African Gold", primary: "#D97706", secondary: "#92400E", accent: "#FBBF24" },
+  { id: "earth", name: "Earth Brown", primary: "#78716C", secondary: "#44403C", accent: "#A8A29E" },
 ];
 
 const FONT_STYLES = [
@@ -79,6 +88,7 @@ const Wizard = () => {
     monetization: "",
     colorTheme: "blue",
     fontStyle: "modern",
+    language: "english",
   });
 
   useEffect(() => {
@@ -144,7 +154,7 @@ const Wizard = () => {
   }
 
   const handleNext = () => {
-    if (step < 6) {
+    if (step < 7) {
       setStep(step + 1);
     } else {
       handleSubmit();
@@ -177,6 +187,7 @@ const Wizard = () => {
           style: formData.style,
           level: formData.level,
           monetization: formData.monetization,
+          language: formData.language,
         }
       });
 
@@ -205,7 +216,7 @@ const Wizard = () => {
 
       // Set generated course to display
       setGeneratedCourse(courseData.course);
-      setStep(7); // Move to course preview step
+      setStep(8); // Move to course preview step
       toast.success("Course generated successfully!");
 
       // Generate course website in background
@@ -234,15 +245,18 @@ const Wizard = () => {
 
   const isStepValid = () => {
     switch (step) {
-      case 1: return formData.topic.trim().length > 0;
-      case 2: return formData.audience.trim().length > 0;
-      case 3: return formData.style.length > 0;
-      case 4: return formData.level.length > 0;
-      case 5: return formData.monetization.length > 0;
-      case 6: return formData.colorTheme.length > 0 && formData.fontStyle.length > 0;
+      case 1: return formData.language.length > 0;
+      case 2: return formData.topic.trim().length > 0;
+      case 3: return formData.audience.trim().length > 0;
+      case 4: return formData.style.length > 0;
+      case 5: return formData.level.length > 0;
+      case 6: return formData.monetization.length > 0;
+      case 7: return formData.colorTheme.length > 0 && formData.fontStyle.length > 0;
       default: return false;
     }
   };
+
+  const selectedLanguage = LANGUAGES.find(l => l.id === formData.language);
 
   const selectedColorTheme = COLOR_THEMES.find(t => t.id === formData.colorTheme);
   const selectedFontStyle = FONT_STYLES.find(f => f.id === formData.fontStyle);
@@ -358,18 +372,18 @@ const Wizard = () => {
       </header>
 
       {/* Progress Bar */}
-      {step <= 6 && (
+      {step <= 7 && (
         <div className="border-b border-border/50 bg-card/30">
           <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between text-sm">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div className="flex items-center justify-between text-sm overflow-x-auto">
+              {[1, 2, 3, 4, 5, 6, 7].map((i) => (
                 <div key={i} className="flex items-center">
-                  <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full shrink-0 ${
                     i <= step ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
                   }`}>
                     {i}
                   </div>
-                  {i < 6 && <div className={`h-1 w-8 md:w-16 ${i < step ? 'bg-primary' : 'bg-muted'}`} />}
+                  {i < 7 && <div className={`h-1 w-6 md:w-12 ${i < step ? 'bg-primary' : 'bg-muted'}`} />}
                 </div>
               ))}
             </div>
@@ -380,7 +394,7 @@ const Wizard = () => {
       {/* Main Content */}
       <main className="container mx-auto max-w-4xl px-4 py-12">
         <Card className="border-border/50 bg-card/80 p-8 backdrop-blur-sm">
-          {step === 7 && generatedCourse ? (
+          {step === 8 && generatedCourse ? (
             <div className="space-y-6">
               <div className="text-center">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4">
@@ -388,6 +402,17 @@ const Wizard = () => {
                 </div>
                 <h2 className="text-3xl font-bold mb-2">Your Course is Ready!</h2>
                 <p className="text-muted-foreground">Review your AI-generated course structure below</p>
+                {selectedLanguage && (
+                  <p className="text-sm text-accent mt-2">
+                    {selectedLanguage.flag} Generated in {selectedLanguage.native}
+                  </p>
+                )}
+              </div>
+
+              {/* Low Bandwidth Notice */}
+              <div className="flex items-center gap-2 p-3 bg-accent/10 rounded-lg text-sm">
+                <Wifi className="h-4 w-4 text-accent" />
+                <span>Optimized for low-bandwidth connections across Africa</span>
               </div>
 
               {/* Website Color Preview */}
@@ -472,6 +497,50 @@ const Wizard = () => {
               </div>
             </div>
           ) : step === 1 && (
+            <div className="space-y-6">
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4">
+                  <Globe className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-3xl font-bold">Choose Your Language</h2>
+                <p className="text-muted-foreground mt-2">Select the language for your course content</p>
+              </div>
+              
+              <RadioGroup
+                value={formData.language}
+                onValueChange={(value) => updateField('language', value)}
+                className="grid grid-cols-2 gap-4"
+              >
+                {LANGUAGES.map((lang) => (
+                  <Label
+                    key={lang.id}
+                    htmlFor={`lang-${lang.id}`}
+                    className={`flex items-center gap-4 p-6 rounded-xl border-2 cursor-pointer transition-all hover:scale-105 ${
+                      formData.language === lang.id 
+                        ? 'border-primary bg-primary/10 shadow-lg' 
+                        : 'border-border/50 bg-card/50 hover:border-primary/50'
+                    }`}
+                  >
+                    <RadioGroupItem value={lang.id} id={`lang-${lang.id}`} className="sr-only" />
+                    <span className="text-4xl">{lang.flag}</span>
+                    <div>
+                      <p className="font-bold text-lg">{lang.name}</p>
+                      <p className="text-muted-foreground">{lang.native}</p>
+                    </div>
+                  </Label>
+                ))}
+              </RadioGroup>
+
+              {/* AU Agenda 2063 Banner */}
+              <div className="mt-6 p-4 bg-gradient-to-r from-green-500/10 via-yellow-500/10 to-red-500/10 rounded-xl border border-border/50">
+                <p className="text-center text-sm text-muted-foreground">
+                  🌍 <span className="font-semibold">Building "The Africa We Want"</span> — Aligned with AU Agenda 2063 for inclusive education and technological advancement
+                </p>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
             <div className="space-y-4">
               <h2 className="text-3xl font-bold">What's your course about?</h2>
               <p className="text-muted-foreground">Tell us the main topic of your course</p>
@@ -479,7 +548,7 @@ const Wizard = () => {
                 <Label htmlFor="topic">Course Topic</Label>
                 <Input
                   id="topic"
-                  placeholder="e.g., Digital Marketing for Beginners"
+                  placeholder="e.g., Digital Marketing for African Businesses"
                   value={formData.topic}
                   onChange={(e) => updateField('topic', e.target.value)}
                   className="border-border/50 bg-background/50"
@@ -488,7 +557,7 @@ const Wizard = () => {
             </div>
           )}
 
-          {step === 2 && (
+          {step === 3 && (
             <div className="space-y-4">
               <h2 className="text-3xl font-bold">Who is your audience?</h2>
               <p className="text-muted-foreground">Describe who will benefit from this course</p>
@@ -496,7 +565,7 @@ const Wizard = () => {
                 <Label htmlFor="audience">Target Audience</Label>
                 <Textarea
                   id="audience"
-                  placeholder="e.g., Small business owners looking to grow their online presence"
+                  placeholder="e.g., African entrepreneurs and small business owners looking to grow online"
                   value={formData.audience}
                   onChange={(e) => updateField('audience', e.target.value)}
                   className="min-h-32 border-border/50 bg-background/50"
@@ -505,7 +574,7 @@ const Wizard = () => {
             </div>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <div className="space-y-4">
               <h2 className="text-3xl font-bold">What's your teaching style?</h2>
               <p className="text-muted-foreground">Choose the tone for your course</p>
@@ -526,7 +595,7 @@ const Wizard = () => {
             </div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <div className="space-y-4">
               <h2 className="text-3xl font-bold">Course difficulty level?</h2>
               <p className="text-muted-foreground">Select the appropriate level for your students</p>
@@ -546,7 +615,7 @@ const Wizard = () => {
             </div>
           )}
 
-          {step === 5 && (
+          {step === 6 && (
             <div className="space-y-4">
               <h2 className="text-3xl font-bold">Monetization strategy?</h2>
               <p className="text-muted-foreground">How do you plan to sell your course?</p>
@@ -568,7 +637,7 @@ const Wizard = () => {
             </div>
           )}
 
-          {step === 6 && (
+          {step === 7 && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-3xl font-bold flex items-center gap-2">
@@ -683,7 +752,7 @@ const Wizard = () => {
           )}
 
           {/* Navigation Buttons */}
-          {step <= 6 && (
+          {step <= 7 && (
             <div className="mt-8 flex justify-between">
               <Button variant="outline" onClick={handleBack}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -694,7 +763,7 @@ const Wizard = () => {
                 disabled={!isStepValid() || loading}
                 className="bg-gradient-to-r from-primary to-accent"
               >
-                {loading ? 'Generating...' : step === 6 ? 'Generate Course' : 'Next'}
+                {loading ? 'Generating...' : step === 7 ? 'Generate Course' : 'Next'}
                 {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
               </Button>
             </div>
