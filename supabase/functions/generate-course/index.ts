@@ -77,8 +77,14 @@ Create comprehensive, well-structured courses with full lesson content and quizz
       "lessons": [
         {
           "title": "Lesson Title",
-          "content": "Full lesson content with detailed explanations, examples, and key takeaways. Use markdown formatting for headers (##), bullet points (-), bold (**text**), and code blocks if relevant. Content should be 200-300 words per lesson. Include African examples and success stories where relevant.",
-          "keyPoints": ["Key point 1", "Key point 2", "Key point 3"]
+           "content": "Full lesson content with detailed explanations, examples, and key takeaways. Use markdown formatting for headers (##), bullet points (-), bold (**text**), and code blocks if relevant. Content should be 200-300 words per lesson. Include African examples and success stories where relevant.",
+           "keyPoints": ["Key point 1", "Key point 2", "Key point 3"],
+           "homework": [
+             {
+               "question": "Practice question for self-study. Open-ended question to help reinforce the lesson concepts.",
+               "hint": "Optional hint to guide the learner"
+             }
+           ]
         }
       ],
       "quiz": {
@@ -95,7 +101,7 @@ Create comprehensive, well-structured courses with full lesson content and quizz
     }
   ]
 }
-Create 3-4 modules with 2-3 lessons each. Each module must have a quiz with 3-4 questions to test student understanding. Be specific, practical, and include real-world African examples.`,
+ Create 3-4 modules with 2-3 lessons each. Each lesson should have 2-3 homework (practice) questions for self-study. Each module must have a quiz with 3-4 questions to test student understanding. Homework questions are open-ended practice questions, while quiz questions are multiple choice. Be specific, practical, and include real-world African examples.`,
             },
             {
               role: "user",

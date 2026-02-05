@@ -11,6 +11,7 @@ import { Sparkles, ArrowLeft, ArrowRight, Palette, Type, CheckCircle, Lock, Load
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { usePaidStatus } from "@/hooks/usePaidStatus";
+ import { useFreeTierLimit, FREE_COURSE_LIMIT } from "@/hooks/useFreeTierLimit";
 
 const LANGUAGES = [
   { id: "english", name: "English", flag: "🇬🇧", native: "English" },
@@ -72,6 +73,7 @@ const Wizard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { isPaid, isAdmin, loading: paidLoading } = usePaidStatus();
+   const { publishedCount, hasReachedLimit, freeCoursesRemaining } = useFreeTierLimit();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [generatedCourse, setGeneratedCourse] = useState<GeneratedCourse | null>(null);
@@ -116,17 +118,18 @@ const Wizard = () => {
     });
   }, [navigate, searchParams]);
 
-  // Show paywall if not paid (and not returning from payment)
-  if (!paidLoading && !isPaid && searchParams.get('payment') !== 'success' && searchParams.get('payment') !== 'succes') {
+   // Show paywall only if they've exceeded free tier AND don't have subscription
+   const needsPayment = !isPaid && hasReachedLimit && !isAdmin;
+   if (!paidLoading && needsPayment && searchParams.get('payment') !== 'success' && searchParams.get('payment') !== 'succes') {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full p-8 text-center space-y-6">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mx-auto">
             <Lock className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold">Premium Feature</h1>
+           <h1 className="text-2xl font-bold">Free Tier Limit Reached</h1>
           <p className="text-muted-foreground">
-            Access to the Course Wizard requires a paid subscription.
+             You've published {FREE_COURSE_LIMIT} free courses. Subscribe to create unlimited courses!
           </p>
           <div className="space-y-3">
             <Button 
@@ -134,8 +137,15 @@ const Wizard = () => {
               onClick={() => navigate('/checkout?plan=monthly')}
             >
               <Sparkles className="mr-2 h-4 w-4" />
-              Subscribe Now
+               Subscribe - $40.99/month
             </Button>
+             <Button 
+               className="w-full"
+               variant="outline"
+               onClick={() => navigate('/checkout?plan=annual')}
+             >
+               Annual - $399.99/year (Save 20%)
+             </Button>
             <Button variant="outline" className="w-full" onClick={() => navigate('/dashboard')}>
               Back to Dashboard
             </Button>
@@ -273,7 +283,7 @@ const Wizard = () => {
       if (isAdmin) {
         const { error } = await supabase
           .from('courses')
-          .update({ website_status: 'paid' })
+           .update({ website_status: 'paid', is_locked: true })
           .eq('id', courseRecordId);
 
         if (error) throw error;
@@ -283,8 +293,25 @@ const Wizard = () => {
         return;
       }
 
-      const productId = formData.monetization === 'annual' ? DODO_PRODUCT_ID_ANNUAL : DODO_PRODUCT_ID_MONTHLY;
+       // Check if user is within free tier
+       const canPublishFree = publishedCount < FREE_COURSE_LIMIT;
+ 
+       if (canPublishFree) {
+         // Free tier: publish directly without payment
+         const { error } = await supabase
+           .from('courses')
+           .update({ website_status: 'paid', is_locked: true })
+           .eq('id', courseRecordId);
+ 
+         if (error) throw error;
+         
+         toast.success(`Course published! You have ${FREE_COURSE_LIMIT - publishedCount - 1} free course(s) remaining.`);
+         navigate('/dashboard');
+         return;
+       }
 
+       // Beyond free tier: require payment
+       const productId = formData.monetization === 'annual' ? DODO_PRODUCT_ID_ANNUAL : DODO_PRODUCT_ID_MONTHLY;
       const { data: { session } } = await supabase.auth.getSession();
       const customerEmail = session?.user?.email;
 
@@ -486,7 +513,7 @@ const Wizard = () => {
                   disabled={paymentLoading}
                 >
                   <Sparkles className="mr-2 h-5 w-5" />
-                  {paymentLoading ? "Processing..." : isAdmin ? "Publish Course" : "Publish Course - $40"}
+                   {paymentLoading ? "Processing..." : isAdmin ? "Publish Course" : publishedCount < FREE_COURSE_LIMIT ? `Publish Course (Free - ${FREE_COURSE_LIMIT - publishedCount} left)` : "Publish Course - $40.99"}
                 </Button>
                 <Button
                   variant="outline"

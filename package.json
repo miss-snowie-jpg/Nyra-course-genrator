@@ -14,6 +14,7 @@
     "deploy:functions": "supabase functions deploy verify-paid --project-ref $SUPABASE_PROJECT_REF"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.11.6",
     "@hookform/resolvers": "^3.10.0",
     "@prisma/client": "^7.2.0",
     "@radix-ui/react-accordion": "^1.2.11",
@@ -49,14 +50,15 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
+    "dompurify": "^2.4.0",
     "embla-carousel-react": "^8.6.0",
     "googleapis": "^169.0.0",
     "input-otp": "^1.4.2",
+    "jspdf": "^4.1.0",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "prisma": "^7.2.0",
     "react": "^18.3.1",
-    "@ffmpeg/ffmpeg": "^0.11.6",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.61.1",
@@ -67,8 +69,7 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
-    "zod": "^3.25.76",
-    "dompurify": "^2.4.0"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",

@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { useSubscription } from "@/hooks/useSubscription";
+ import { useFreeTierLimit, FREE_COURSE_LIMIT } from "@/hooks/useFreeTierLimit";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Plus, BookOpen, TrendingUp, DollarSign, LogOut, Video, CheckCircle, Clock, ExternalLink, Trash2, Settings, Share2, Crown } from "lucide-react";
+ import { Sparkles, Plus, BookOpen, TrendingUp, DollarSign, LogOut, Video, CheckCircle, Clock, ExternalLink, Trash2, Settings, Share2, Crown, Lock, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
+ import { ShareCourse } from "@/components/ShareCourse";
 
 interface Course {
   id: string;
@@ -17,12 +19,14 @@ interface Course {
   topic: string;
   website_status: string | null;
   created_at: string;
+   is_locked?: boolean;
 }
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAdminRole();
   const { subscription, hasSubscription, hasAutoPoster, loading: subscriptionLoading } = useSubscription();
+   const { publishedCount, hasReachedLimit, freeCoursesRemaining } = useFreeTierLimit();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState<Course[]>([]);

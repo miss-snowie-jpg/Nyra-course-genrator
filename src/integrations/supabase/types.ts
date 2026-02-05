@@ -70,9 +70,12 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_locked: boolean
+          language: string | null
           level: string
           modules: Json | null
           monetization: string
+          share_enabled: boolean
           style: string
           title: string
           topic: string
@@ -86,9 +89,12 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_locked?: boolean
+          language?: string | null
           level: string
           modules?: Json | null
           monetization: string
+          share_enabled?: boolean
           style: string
           title: string
           topic: string
@@ -102,9 +108,12 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_locked?: boolean
+          language?: string | null
           level?: string
           modules?: Json | null
           monetization?: string
+          share_enabled?: boolean
           style?: string
           title?: string
           topic?: string
@@ -157,6 +166,30 @@ export type Database = {
           title?: string
           updated_at?: string
           video_url?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          preferred_language: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          preferred_language?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          preferred_language?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
