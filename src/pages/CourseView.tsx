@@ -3,13 +3,15 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sparkles, ArrowLeft, BookOpen, GraduationCap, ChevronRight, CheckCircle2, HelpCircle, Trophy, Wifi, WifiOff } from "lucide-react";
+ import { Sparkles, ArrowLeft, BookOpen, GraduationCap, ChevronRight, CheckCircle2, HelpCircle, Trophy, Wifi, WifiOff, Download, Share2, ClipboardList } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+ import { PDFDownload } from "@/components/PDFDownload";
+ import { ShareCourse } from "@/components/ShareCourse";
 
 interface QuizQuestion {
   question: string;
@@ -23,10 +25,16 @@ interface ModuleQuiz {
   questions: QuizQuestion[];
 }
 
+ interface HomeworkQuestion {
+   question: string;
+   hint?: string;
+ }
+ 
 interface Lesson {
   title: string;
   content: string;
   keyPoints?: string[];
+   homework?: HomeworkQuestion[];
 }
 
 interface Module {
@@ -57,6 +65,7 @@ const CourseView = () => {
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [completedQuizzes, setCompletedQuizzes] = useState<Set<number>>(new Set());
+   const [showHomework, setShowHomework] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSlowConnection, setIsSlowConnection] = useState(false);
 
@@ -214,9 +223,9 @@ const CourseView = () => {
   };
 
   // Helper to get lesson data (handles both old string format and new object format)
-  const getLessonData = (lesson: Lesson | string | unknown): { title: string; content: string; keyPoints: string[] } => {
+   const getLessonData = (lesson: Lesson | string | unknown): { title: string; content: string; keyPoints: string[]; homework: HomeworkQuestion[] } => {
     if (typeof lesson === 'string') {
-      return { title: lesson, content: '', keyPoints: [] };
+       return { title: lesson, content: '', keyPoints: [], homework: [] };
     }
     if (typeof lesson === 'object' && lesson !== null) {
       const obj = lesson as Record<string, unknown>;
@@ -228,9 +237,22 @@ const CourseView = () => {
           typeof p === 'string' ? p : (typeof p === 'object' && p !== null ? JSON.stringify(p) : String(p))
         );
       }
-      return { title, content, keyPoints };
+       let homework: HomeworkQuestion[] = [];
+       if (Array.isArray(obj.homework)) {
+         homework = obj.homework.map((h: unknown) => {
+           if (typeof h === 'object' && h !== null) {
+             const hw = h as Record<string, unknown>;
+             return {
+               question: typeof hw.question === 'string' ? hw.question : String(hw.question || ''),
+               hint: typeof hw.hint === 'string' ? hw.hint : undefined
+             };
+           }
+           return { question: String(h) };
+         });
+       }
+       return { title, content, keyPoints, homework };
     }
-    return { title: 'Untitled Lesson', content: '', keyPoints: [] };
+     return { title: 'Untitled Lesson', content: '', keyPoints: [], homework: [] };
   };
 
   if (loading) {
@@ -600,6 +622,62 @@ const CourseView = () => {
                     </div>
                   )}
 
+                   {/* Homework Section */}
+                   {lessonData.homework && lessonData.homework.length > 0 && (
+                     <div className="bg-accent/5 rounded-xl border border-accent/20 p-6">
+                       <div className="flex items-center justify-between mb-4">
+                         <h3 className="text-lg font-semibold flex items-center gap-2">
+                           <ClipboardList className="h-5 w-5 text-accent" />
+                           Practice Questions (Homework)
+                         </h3>
+                         <Button 
+                           variant="ghost" 
+                           size="sm"
+                           onClick={() => setShowHomework(!showHomework)}
+                         >
+                           {showHomework ? 'Hide' : 'Show'}
+                         </Button>
+                       </div>
+                       {showHomework && (
+                         <div className="space-y-4">
+                           {lessonData.homework.map((hw, index) => (
+                             <div key={index} className="bg-card rounded-lg p-4 border border-border/50">
+                               <p className="font-medium mb-2">
+                                 {index + 1}. {hw.question}
+                               </p>
+                               {hw.hint && (
+                                 <p className="text-sm text-muted-foreground italic">
+                                   💡 Hint: {hw.hint}
+                                 </p>
+                               )}
+                             </div>
+                           ))}
+                           <p className="text-sm text-muted-foreground text-center mt-4">
+                             These practice questions are for self-study. Reflect on your answers before moving on.
+                           </p>
+                         </div>
+                       )}
+                     </div>
+                   )}
+ 
+                   {/* PDF Download & Share */}
+                   <div className="flex flex-wrap gap-2">
+                     <PDFDownload 
+                       courseTitle={course.title}
+                       modules={course.modules}
+                       currentModuleIndex={activeModule}
+                       currentLessonIndex={activeLesson}
+                       downloadType="lesson"
+                     />
+                     <PDFDownload 
+                       courseTitle={course.title}
+                       modules={course.modules}
+                       currentModuleIndex={activeModule}
+                       downloadType="module"
+                     />
+                     <ShareCourse courseId={course.id} courseTitle={course.title} />
+                   </div>
+ 
                   {/* Mark Complete & Navigation */}
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border/50">
                     <Button

@@ -5,8 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Sparkles } from "lucide-react";
+ import { Sparkles, Globe, ArrowRight, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+ 
+ const LANGUAGES = [
+   { id: "english", name: "English", flag: "🇬🇧", native: "English" },
+   { id: "amharic", name: "Amharic", flag: "🇪🇹", native: "አማርኛ" },
+   { id: "swahili", name: "Swahili", flag: "🇰🇪", native: "Kiswahili" },
+   { id: "french", name: "French", flag: "🇫🇷", native: "Français" },
+ ];
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -16,39 +24,56 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+   const [step, setStep] = useState<'auth' | 'language'>('auth');
+   const [selectedLanguage, setSelectedLanguage] = useState("english");
 
   const getRedirectUrl = () => {
-    // Always redirect to pricing page after auth (users must choose a plan)
-    // Plan param is used if user came from landing page with a specific plan
     if (plan && plan !== 'free') {
       return `/checkout?plan=${plan}`;
     }
-    // Default: redirect to pricing page to choose a plan
     return '/pricing';
   };
 
   useEffect(() => {
-    // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         navigate(getRedirectUrl());
       }
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
+       if (session && step === 'auth' && isLogin) {
         navigate(getRedirectUrl());
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, plan]);
+   }, [navigate, plan, step, isLogin]);
+ 
+   const saveLanguageAndProceed = async () => {
+     setLoading(true);
+     try {
+       const { data: { session } } = await supabase.auth.getSession();
+       if (session) {
+         await supabase
+           .from('profiles')
+           .upsert({ 
+             user_id: session.user.id, 
+             preferred_language: selectedLanguage 
+           });
+         toast.success("Language preference saved!");
+         navigate(getRedirectUrl());
+       }
+     } catch (error: any) {
+       toast.error(error.message || "Failed to save language");
+     } finally {
+       setLoading(false);
+     }
+   };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Basic client-side password policy to reduce weak passwords
     if (!password || password.length < 8) {
       toast.error('Password must be at least 8 characters long')
       return
@@ -73,7 +98,8 @@ const Auth = () => {
           },
         });
         if (error) throw error;
-        toast.success("Account created! Please check your email.");
+         toast.success("Account created!");
+         setStep('language');
       }
     } catch (error: any) {
       toast.error(error.message || "Authentication failed");
@@ -82,6 +108,66 @@ const Auth = () => {
     }
   };
 
+   if (step === 'language') {
+     return (
+       <div className="flex min-h-screen items-center justify-center bg-background p-4">
+         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/10" />
+         
+         <Card className="relative w-full max-w-md border-border/50 bg-card/80 p-8 backdrop-blur-sm">
+           <div className="mb-8 text-center">
+             <div className="mb-4 inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent">
+               <Globe className="h-8 w-8 text-white" />
+             </div>
+             <h1 className="mb-2 text-2xl font-bold">Choose Your Language</h1>
+             <p className="text-muted-foreground">
+               Select your preferred language for courses and content
+             </p>
+           </div>
+ 
+           <RadioGroup
+             value={selectedLanguage}
+             onValueChange={setSelectedLanguage}
+             className="grid grid-cols-2 gap-3 mb-6"
+           >
+             {LANGUAGES.map((lang) => (
+               <Label
+                 key={lang.id}
+                 htmlFor={`lang-${lang.id}`}
+                 className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all hover:scale-105 ${
+                   selectedLanguage === lang.id 
+                     ? 'border-primary bg-primary/10 shadow-lg' 
+                     : 'border-border/50 bg-card/50 hover:border-primary/50'
+                 }`}
+               >
+                 <RadioGroupItem value={lang.id} id={`lang-${lang.id}`} className="sr-only" />
+                 <span className="text-2xl">{lang.flag}</span>
+                 <div>
+                   <p className="font-medium text-sm">{lang.name}</p>
+                   <p className="text-xs text-muted-foreground">{lang.native}</p>
+                 </div>
+               </Label>
+             ))}
+           </RadioGroup>
+ 
+           <Button
+             className="w-full bg-gradient-to-r from-primary to-accent"
+             onClick={saveLanguageAndProceed}
+             disabled={loading}
+           >
+             {loading ? "Saving..." : "Continue"}
+             <ArrowRight className="ml-2 h-4 w-4" />
+           </Button>
+ 
+           <div className="mt-4 p-3 bg-accent/10 rounded-lg">
+             <p className="text-xs text-center text-muted-foreground">
+               🌍 Building "The Africa We Want" — Aligned with AU Agenda 2063
+             </p>
+           </div>
+         </Card>
+       </div>
+     );
+   }
+ 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/10" />
@@ -100,7 +186,7 @@ const Auth = () => {
           <p className="text-muted-foreground">
             {isLogin 
               ? "Sign in to continue building your courses" 
-              : "Create your account and start your free trial"}
+               : "Create your account — 2 free courses included!"}
           </p>
         </div>
 
@@ -136,7 +222,7 @@ const Auth = () => {
             className="w-full bg-gradient-to-r from-primary to-accent"
             disabled={loading}
           >
-            {loading ? "Loading..." : isLogin ? "Sign In" : "Start Free Trial"}
+             {loading ? "Loading..." : isLogin ? "Sign In" : "Create Account"}
           </Button>
         </form>
 
@@ -151,6 +237,14 @@ const Auth = () => {
               : "Already have an account? Sign in"}
           </button>
         </div>
+         
+         {!isLogin && (
+           <div className="mt-4 p-3 bg-primary/5 rounded-lg border border-primary/20">
+             <p className="text-xs text-center text-muted-foreground">
+               ✨ <span className="font-medium">Free tier:</span> Create and publish up to 2 courses for free
+             </p>
+           </div>
+         )}
       </Card>
     </div>
   );
