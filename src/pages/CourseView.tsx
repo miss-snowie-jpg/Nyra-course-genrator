@@ -43,6 +43,13 @@ interface Module {
   quiz?: ModuleQuiz;
 }
 
+interface ColorTheme {
+  primary: string;
+  secondary: string;
+  accent: string;
+  name: string;
+}
+
 interface Course {
   id: string;
   title: string;
@@ -51,6 +58,7 @@ interface Course {
   style: string;
   audience: string;
   modules: Module[];
+  color_theme?: ColorTheme | null;
 }
 
 const CourseView = () => {
@@ -119,6 +127,7 @@ const CourseView = () => {
         style: data.style,
         audience: data.audience,
         modules: (data.modules as unknown as Module[]) || [],
+        color_theme: data.color_theme as unknown as ColorTheme | null,
       });
       setLoading(false);
     };
@@ -279,9 +288,10 @@ const CourseView = () => {
   const totalLessons = course.modules.reduce((acc, mod) => acc + mod.lessons.length, 0);
   const completedCount = completedLessons.size;
   const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+  const ct = course.color_theme; // custom color theme
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" style={ct ? { '--ct-primary': ct.primary, '--ct-secondary': ct.secondary, '--ct-accent': ct.accent } as React.CSSProperties : undefined}>
       {/* Network Status Banner - shows on slow/offline connections */}
       {(!isOnline || isSlowConnection) && (
         <div className={`py-2 px-4 text-center text-sm flex items-center justify-center gap-2 ${
@@ -310,8 +320,10 @@ const CourseView = () => {
               <span className="hidden sm:inline">Back</span>
             </Button>
             <div className="flex items-center gap-2 text-lg font-bold">
-              <GraduationCap className="h-5 w-5 text-primary" />
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent hidden sm:inline truncate max-w-[200px]">
+              <GraduationCap className="h-5 w-5" style={ct ? { color: ct.primary } : undefined} />
+              <span className={ct ? "hidden sm:inline truncate max-w-[200px] font-bold" : "bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent hidden sm:inline truncate max-w-[200px]"}
+                style={ct ? { backgroundImage: `linear-gradient(to right, ${ct.primary}, ${ct.accent})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' } : undefined}
+              >
                 {course.title}
               </span>
             </div>
@@ -320,8 +332,8 @@ const CourseView = () => {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <div className="w-20 sm:w-32 h-2 bg-muted rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-300"
-                  style={{ width: `${progressPercent}%` }}
+                  className="h-full transition-all duration-300"
+                  style={{ width: `${progressPercent}%`, background: ct ? `linear-gradient(to right, ${ct.primary}, ${ct.accent})` : undefined }}
                 />
               </div>
               <span className="text-xs">{progressPercent}%</span>
@@ -349,9 +361,10 @@ const CourseView = () => {
                       }}
                       className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
                         activeModule === moduleIndex
-                          ? 'bg-primary/10 text-primary border border-primary/20'
+                          ? 'border'
                           : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'
                       }`}
+                      style={activeModule === moduleIndex && ct ? { backgroundColor: `${ct.primary}15`, color: ct.primary, borderColor: `${ct.primary}33` } : activeModule === moduleIndex ? {} : undefined}
                     >
                       <span className="text-xs font-medium opacity-70">Module {moduleIndex + 1}</span>
                       <p className="text-sm font-medium line-clamp-2">{module.title}</p>
@@ -368,9 +381,10 @@ const CourseView = () => {
                               onClick={() => setActiveLesson(lessonIndex)}
                               className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-all ${
                                 activeLesson === lessonIndex
-                                  ? 'bg-primary text-primary-foreground'
+                                  ? (ct ? 'text-white' : 'bg-primary text-primary-foreground')
                                   : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'
                               }`}
+                              style={activeLesson === lessonIndex && ct ? { backgroundColor: ct.primary } : undefined}
                             >
                               {isComplete ? (
                                 <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-green-500" />

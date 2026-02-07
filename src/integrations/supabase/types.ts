@@ -67,6 +67,7 @@ export type Database = {
       courses: {
         Row: {
           audience: string
+          color_theme: Json | null
           created_at: string
           description: string | null
           id: string
@@ -86,6 +87,7 @@ export type Database = {
         }
         Insert: {
           audience: string
+          color_theme?: Json | null
           created_at?: string
           description?: string | null
           id?: string
@@ -105,6 +107,7 @@ export type Database = {
         }
         Update: {
           audience?: string
+          color_theme?: Json | null
           created_at?: string
           description?: string | null
           id?: string
