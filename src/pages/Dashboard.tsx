@@ -48,21 +48,7 @@ const Dashboard = () => {
         _role: 'admin'
       });
       
-      if (!adminData) {
-        // Check for active subscription
-        const { data: sub } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .eq('status', 'active')
-          .single();
-        
-        if (!sub) {
-          // No subscription, redirect to pricing
-          navigate('/pricing');
-          return;
-        }
-      }
+      // No subscription check needed — free tier allows first 2 courses without payment
       
       fetchCourses(session.user.id);
       setLoading(false);
