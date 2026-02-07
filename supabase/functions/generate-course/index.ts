@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const LANGUAGE_INSTRUCTIONS: Record<string, string> = {
@@ -14,14 +14,82 @@ const LANGUAGE_INSTRUCTIONS: Record<string, string> = {
 
 const AFRICAN_CONTEXT = `
 IMPORTANT CONTEXT - Use African Success Stories and Examples:
-- When giving business examples, reference African success stories like M-Pesa (Kenya's mobile money revolution), Dangote Group (Africa's largest industrial conglomerate), Ethiopian Airlines (Africa's leading airline), Jumia (Africa's e-commerce pioneer), Flutterwave (Pan-African fintech), or Andela (tech talent accelerator).
-- Reference local innovators and entrepreneurs when relevant.
-- Align content with AU Agenda 2063 vision of "The Africa We Want" - emphasizing sustainable development, technological advancement, and inclusive growth.
+- Reference African success stories like M-Pesa, Dangote Group, Ethiopian Airlines, Jumia, Flutterwave, or Andela.
+- Align content with AU Agenda 2063 vision of "The Africa We Want".
 - Use culturally relevant metaphors and examples that resonate with African learners.
 - Be encouraging, professional, and visionary in tone.
 - Keep explanations concise and clear to accommodate ESL learners.
-- Include practical, actionable steps that can be applied in African contexts.
+- Include practical, actionable steps applicable in African contexts.
 `;
+
+const COURSE_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "create_course",
+    description: "Create a structured course with modules, lessons, homework and quizzes.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Course title" },
+        description: { type: "string", description: "Brief course description (2-3 sentences)" },
+        modules: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              lessons: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string" },
+                    content: { type: "string", description: "Full lesson content, 150-250 words. Use markdown. Include African examples." },
+                    keyPoints: { type: "array", items: { type: "string" }, description: "3 key takeaways" },
+                    homework: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          question: { type: "string", description: "Open-ended practice question" },
+                          hint: { type: "string", description: "Optional hint" },
+                        },
+                        required: ["question"],
+                      },
+                    },
+                  },
+                  required: ["title", "content", "keyPoints", "homework"],
+                },
+              },
+              quiz: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  questions: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        question: { type: "string" },
+                        options: { type: "array", items: { type: "string" }, description: "Exactly 4 options" },
+                        correctIndex: { type: "number", description: "0-based index of correct answer" },
+                        explanation: { type: "string" },
+                      },
+                      required: ["question", "options", "correctIndex", "explanation"],
+                    },
+                  },
+                },
+                required: ["title", "questions"],
+              },
+            },
+            required: ["title", "lessons", "quiz"],
+          },
+        },
+      },
+      required: ["title", "description", "modules"],
+    },
+  },
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -30,7 +98,7 @@ serve(async (req) => {
 
   try {
     const { topic, language = "english" } = await req.json();
-    
+
     if (!topic) {
       throw new Error("Topic is required");
     }
@@ -44,9 +112,8 @@ serve(async (req) => {
 
     const languageInstruction = LANGUAGE_INSTRUCTIONS[language] || LANGUAGE_INSTRUCTIONS.english;
 
-    // Use AbortController for timeout handling
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 55000); // 55 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
 
     try {
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -61,55 +128,16 @@ serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: `You are an expert course curriculum designer creating courses for African learners. 
-
-${AFRICAN_CONTEXT}
-
-${languageInstruction}
-
-Create comprehensive, well-structured courses with full lesson content and quizzes. Return courses in JSON format with the following structure:
-{
-  "title": "Course Title",
-  "description": "Brief course description (2-3 sentences)",
-  "modules": [
-    {
-      "title": "Module Title",
-      "lessons": [
-        {
-          "title": "Lesson Title",
-           "content": "Full lesson content with detailed explanations, examples, and key takeaways. Use markdown formatting for headers (##), bullet points (-), bold (**text**), and code blocks if relevant. Content should be 200-300 words per lesson. Include African examples and success stories where relevant.",
-           "keyPoints": ["Key point 1", "Key point 2", "Key point 3"],
-           "homework": [
-             {
-               "question": "Practice question for self-study. Open-ended question to help reinforce the lesson concepts.",
-               "hint": "Optional hint to guide the learner"
-             }
-           ]
-        }
-      ],
-      "quiz": {
-        "title": "Module Quiz",
-        "questions": [
-          {
-            "question": "Question text here?",
-            "options": ["Option A", "Option B", "Option C", "Option D"],
-            "correctIndex": 0,
-            "explanation": "Brief explanation of why this answer is correct"
-          }
-        ]
-      }
-    }
-  ]
-}
- Create 3-4 modules with 2-3 lessons each. Each lesson should have 2-3 homework (practice) questions for self-study. Each module must have a quiz with 3-4 questions to test student understanding. Homework questions are open-ended practice questions, while quiz questions are multiple choice. Be specific, practical, and include real-world African examples.`,
+              content: `You are an expert course curriculum designer for African learners.\n\n${AFRICAN_CONTEXT}\n\n${languageInstruction}\n\nCreate 3 modules with 2-3 lessons each. Each lesson needs 2 homework questions. Each module quiz needs 3 questions. Keep lesson content concise (150-250 words). Use the create_course tool to return the course.`,
             },
             {
               role: "user",
               content: `Create a comprehensive course about: ${topic}`,
             },
           ],
+          tools: [COURSE_TOOL],
+          tool_choice: { type: "function", function: { name: "create_course" } },
           temperature: 0.7,
-          max_tokens: 8000,
         }),
       });
 
@@ -118,64 +146,55 @@ Create comprehensive, well-structured courses with full lesson content and quizz
       if (!response.ok) {
         const errorText = await response.text();
         console.error("AI gateway error:", response.status, errorText);
+        if (response.status === 429) {
+          throw new Error("AI rate limit reached. Please try again in a moment.");
+        }
+        if (response.status === 402) {
+          throw new Error("AI credits exhausted. Please add credits.");
+        }
         throw new Error(`AI gateway error: ${response.status}`);
       }
 
       const data = await response.json();
-      const content = data.choices[0].message.content;
-      
-      // Parse the JSON response from the AI
-      let course;
-      try {
-        // First try direct parsing
-        course = JSON.parse(content);
-      } catch (e) {
-        console.log("Direct JSON parse failed, attempting extraction...");
-        
-        // Try to extract JSON from various markdown code block formats
-        let jsonString = content;
-        
-        // Try ```json blocks first
-        const jsonCodeBlockMatch = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-        if (jsonCodeBlockMatch) {
-          jsonString = jsonCodeBlockMatch[1].trim();
-        } else {
-          // Try to find JSON object directly (starts with { and ends with })
-          const jsonObjectMatch = content.match(/\{[\s\S]*\}/);
-          if (jsonObjectMatch) {
-            jsonString = jsonObjectMatch[0];
+      console.log("AI response received, parsing tool call...");
+
+      // Extract from tool call
+      const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+      if (!toolCall || toolCall.function.name !== "create_course") {
+        // Fallback: try parsing content as JSON
+        const content = data.choices?.[0]?.message?.content;
+        if (content) {
+          console.log("No tool call found, trying content parse fallback...");
+          let course;
+          try {
+            course = JSON.parse(content);
+          } catch {
+            const match = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/) || content.match(/\{[\s\S]*\}/);
+            const jsonStr = match ? (match[1] || match[0]).trim() : content;
+            course = JSON.parse(jsonStr.replace(/,\s*([}\]])/g, "$1"));
           }
+          console.log("Course parsed from content with", course.modules?.length || 0, "modules");
+          return new Response(JSON.stringify({ course }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
-        
-        // Clean up common JSON issues
-        // Remove trailing commas before } or ]
-        jsonString = jsonString.replace(/,\s*([}\]])/g, '$1');
-        // Remove any BOM or invisible characters
-        jsonString = jsonString.replace(/^\uFEFF/, '').trim();
-        
-        try {
-          course = JSON.parse(jsonString);
-        } catch (parseError) {
-          console.error("Failed to parse extracted JSON:", jsonString.substring(0, 500));
-          throw new Error("Failed to parse course structure from AI response");
-        }
+        throw new Error("AI did not return a valid course structure");
       }
 
+      const course = JSON.parse(toolCall.function.arguments);
       console.log("Course generated successfully with", course.modules?.length || 0, "modules");
 
       return new Response(JSON.stringify({ course }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-
     } catch (fetchError: unknown) {
       clearTimeout(timeoutId);
-      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+      if (fetchError instanceof Error && fetchError.name === "AbortError") {
         console.error("Request timed out");
         throw new Error("Course generation timed out. Please try again.");
       }
       throw fetchError;
     }
-
   } catch (error) {
     console.error("Error in generate-course function:", error);
     const errorMessage = error instanceof Error ? error.message : "Failed to generate course";
