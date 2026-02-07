@@ -204,6 +204,7 @@ const Wizard = () => {
       if (generateError) throw generateError;
 
       // Save to database
+      const selectedTheme = COLOR_THEMES.find(t => t.id === formData.colorTheme);
       const { data: insertedCourse, error: insertError } = await (supabase as any)
         .from('courses')
         .insert({
@@ -216,6 +217,7 @@ const Wizard = () => {
           level: formData.level,
           monetization: formData.monetization,
           modules: courseData.course.modules,
+          color_theme: selectedTheme ? { primary: selectedTheme.primary, secondary: selectedTheme.secondary, accent: selectedTheme.accent, name: selectedTheme.name } : null,
         })
         .select()
         .single();

@@ -31,7 +31,7 @@ const Auth = () => {
     if (plan && plan !== 'free') {
       return `/checkout?plan=${plan}`;
     }
-    return '/pricing';
+    return '/dashboard';
   };
 
   useEffect(() => {
@@ -98,7 +98,7 @@ const Auth = () => {
           },
         });
         if (error) throw error;
-         toast.success("Account created!");
+         toast.success("Account created! Please check your email to verify your account.");
          setStep('language');
       }
     } catch (error: any) {
@@ -149,20 +149,26 @@ const Auth = () => {
              ))}
            </RadioGroup>
  
-           <Button
-             className="w-full bg-gradient-to-r from-primary to-accent"
-             onClick={saveLanguageAndProceed}
-             disabled={loading}
-           >
-             {loading ? "Saving..." : "Continue"}
-             <ArrowRight className="ml-2 h-4 w-4" />
-           </Button>
- 
-           <div className="mt-4 p-3 bg-accent/10 rounded-lg">
-             <p className="text-xs text-center text-muted-foreground">
-               🌍 Building "The Africa We Want" — Aligned with AU Agenda 2063
-             </p>
-           </div>
+            <div className="mb-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+              <p className="text-sm text-center text-yellow-700 dark:text-yellow-300">
+                📧 Please verify your email address to activate your account. Check your inbox for a confirmation link.
+              </p>
+            </div>
+
+            <Button
+              className="w-full bg-gradient-to-r from-primary to-accent"
+              onClick={saveLanguageAndProceed}
+              disabled={loading}
+            >
+              {loading ? "Saving..." : "Continue to Dashboard"}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+  
+            <div className="mt-4 p-3 bg-accent/10 rounded-lg">
+              <p className="text-xs text-center text-muted-foreground">
+                🌍 Building "The Africa We Want" — Aligned with AU Agenda 2063
+              </p>
+            </div>
          </Card>
        </div>
      );
