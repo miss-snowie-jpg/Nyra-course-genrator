@@ -115,7 +115,7 @@ const CourseView = () => {
         .single();
 
       if (error || !data) {
-        navigate('/dashboard');
+        setLoading(false);
         return;
       }
 
@@ -276,7 +276,15 @@ const CourseView = () => {
   }
 
   if (!course) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h2 className="text-xl font-semibold">Course not found</h2>
+          <p className="text-muted-foreground">This course may not exist or is not available for sharing.</p>
+        </div>
+      </div>
+    );
   }
 
   const currentModule = course.modules[activeModule];
