@@ -59,6 +59,8 @@ interface Course {
   audience: string;
   modules: Module[];
   color_theme?: ColorTheme | null;
+  website_status?: string | null;
+  user_id: string;
 }
 
 const CourseView = () => {
@@ -66,6 +68,7 @@ const CourseView = () => {
   const navigate = useNavigate();
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isOwner, setIsOwner] = useState(false);
   const [activeModule, setActiveModule] = useState(0);
   const [activeLesson, setActiveLesson] = useState(0);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
@@ -108,6 +111,9 @@ const CourseView = () => {
         return;
       }
 
+      // Check if current user is the owner
+      const { data: { session } } = await supabase.auth.getSession();
+
       const { data, error } = await supabase
         .from('courses')
         .select('*')
@@ -119,6 +125,8 @@ const CourseView = () => {
         return;
       }
 
+      setIsOwner(session?.user?.id === data.user_id);
+
       setCourse({
         id: data.id,
         title: data.title,
@@ -128,6 +136,8 @@ const CourseView = () => {
         audience: data.audience,
         modules: (data.modules as unknown as Module[]) || [],
         color_theme: data.color_theme as unknown as ColorTheme | null,
+        website_status: data.website_status,
+        user_id: data.user_id,
       });
       setLoading(false);
     };
@@ -283,6 +293,91 @@ const CourseView = () => {
           <h2 className="text-xl font-semibold">Course not found</h2>
           <p className="text-muted-foreground">This course may not exist or is not available for sharing.</p>
         </div>
+      </div>
+    );
+  }
+
+  // Paywall: if the course owner paid, non-owners must pay to view full content
+  const isPaidCourse = course.website_status === 'paid';
+  const requiresPayment = isPaidCourse && !isOwner;
+
+  if (requiresPayment) {
+    const ct = course.color_theme;
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm">
+          <div className="container mx-auto flex items-center justify-between px-4 py-4">
+            <div className="flex items-center gap-2 text-2xl font-bold">
+              <Sparkles className="h-6 w-6 text-primary" />
+              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Nyra
+              </span>
+            </div>
+            <ThemeToggle />
+          </div>
+        </header>
+
+        <main className="container mx-auto px-4 py-12 max-w-2xl">
+          <div className="text-center mb-8">
+            <GraduationCap className="mx-auto h-16 w-16 text-primary mb-4" style={ct ? { color: ct.primary } : undefined} />
+            <h1 className="text-3xl font-bold mb-2">{course.title}</h1>
+            {course.description && (
+              <p className="text-muted-foreground text-lg">{course.description}</p>
+            )}
+            <div className="flex items-center justify-center gap-3 mt-4 text-sm text-muted-foreground">
+              <span className="capitalize">{course.level}</span>
+              <span>•</span>
+              <span>{course.modules.length} modules</span>
+              <span>•</span>
+              <span>{course.modules.reduce((acc, m) => acc + m.lessons.length, 0)} lessons</span>
+            </div>
+          </div>
+
+          {/* Module preview list */}
+          <Card className="mb-8 p-6 border-border/50">
+            <h3 className="font-semibold mb-4 text-lg">What you'll learn</h3>
+            <div className="space-y-3">
+              {course.modules.map((module, i) => (
+                <div key={i} className="flex items-start gap-3 text-sm">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium"
+                    style={ct ? { backgroundColor: `${ct.primary}15`, color: ct.primary } : undefined}
+                  >
+                    {i + 1}
+                  </span>
+                  <div>
+                    <p className="font-medium">{module.title}</p>
+                    <p className="text-muted-foreground">{module.lessons.length} lessons</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Payment gate */}
+          <Card className="p-8 text-center border-primary/30 bg-gradient-to-b from-primary/5 to-card">
+            <Trophy className="mx-auto h-10 w-10 text-primary mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Unlock Full Course</h2>
+            <p className="text-muted-foreground mb-6">
+              Subscribe to access all lessons, quizzes, and homework for this course.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button
+                size="lg"
+                onClick={() => navigate('/auth?redirect=' + encodeURIComponent(`/course/${course.id}`))}
+                variant="outline"
+              >
+                Sign In
+              </Button>
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-primary to-accent"
+                onClick={() => navigate('/pricing')}
+              >
+                Subscribe Now
+              </Button>
+            </div>
+          </Card>
+        </main>
       </div>
     );
   }
